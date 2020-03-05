@@ -98,7 +98,13 @@ struct GlState {
     texture: Texture,
     clip: Option<(i32, i32, i32, i32)>,
     projection: glam::Mat4,
-    model: glam::Mat4,
+    model_stack: Vec<glam::Mat4>,
+}
+
+impl GlState {
+    fn model(&self) -> glam::Mat4 {
+        *self.model_stack.last().unwrap()
+    }
 }
 
 pub struct QuadGl {
@@ -143,7 +149,7 @@ impl QuadGl {
                 clip: None,
                 texture: white_texture,
                 projection: glam::Mat4::identity(),
-                model: glam::Mat4::identity(),
+                model_stack: vec![glam::Mat4::identity()],
             },
             draw_calls: Vec::with_capacity(200),
             draw_calls_bindings: Vec::with_capacity(200),
@@ -157,7 +163,7 @@ impl QuadGl {
         self.state.clip = None;
         self.state.texture = self.white_texture;
         self.state.projection = glam::Mat4::identity();
-        self.state.model = glam::Mat4::identity();
+        self.state.model_stack = vec![glam::Mat4::identity()];
 
         self.draw_calls_count = 0;
     }
@@ -218,7 +224,17 @@ impl QuadGl {
         self.draw_calls_count = 0;
     }
 
-    pub fn draw_call(&mut self, vertices: &[Vertex], indices: &[u16]) {
+    pub fn push_model_matrix(&mut self, matrix: glam::Mat4) {
+        self.state.model_stack.push(self.state.model() * matrix);
+    }
+
+    pub fn pop_model_matrix(&mut self) {
+        if self.state.model_stack.len() > 1 {
+            self.state.model_stack.pop();
+        }
+    }
+
+    pub fn geometry(&mut self, vertices: &[Vertex], indices: &[u16]) {
         let previous_dc_ix = if self.draw_calls_count == 0 {
             None
         } else {
@@ -229,7 +245,7 @@ impl QuadGl {
         if previous_dc.map_or(true, |draw_call| {
             draw_call.texture != self.state.texture
                 || draw_call.clip != self.state.clip
-                || draw_call.model != self.state.model
+                || draw_call.model != self.state.model()
                 || draw_call.projection != self.state.projection
                 || draw_call.vertices_count >= MAX_VERTICES - vertices.len()
                 || draw_call.indices_count >= MAX_INDICES - indices.len()
@@ -238,7 +254,7 @@ impl QuadGl {
                 self.draw_calls.push(DrawCall::new(
                     self.state.texture,
                     self.state.projection,
-                    self.state.model,
+                    self.state.model(),
                 ));
             }
             self.draw_calls[self.draw_calls_count].texture = self.state.texture;
@@ -246,7 +262,7 @@ impl QuadGl {
             self.draw_calls[self.draw_calls_count].indices_count = 0;
             self.draw_calls[self.draw_calls_count].clip = self.state.clip;
             self.draw_calls[self.draw_calls_count].projection = self.state.projection;
-            self.draw_calls[self.draw_calls_count].model = self.state.model;
+            self.draw_calls[self.draw_calls_count].model = self.state.model();
 
             self.draw_calls_count += 1;
         };

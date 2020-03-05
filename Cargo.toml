@@ -6,5 +6,5 @@ edition = "2018"
 
 [dependencies]
 miniquad = "0.2"
-glam = "*"
+glam = {version = "0.8", features = ["scalar-math"] }
 image = { version = "0.22", default-features = false, features = ["png_codec"] }
