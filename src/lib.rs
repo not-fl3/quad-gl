@@ -224,6 +224,18 @@ impl QuadGl {
         self.draw_calls_count = 0;
     }
 
+    pub fn texture(&mut self, texture: Option<Texture2D>) {
+        self.state.texture = texture.map_or(self.white_texture, |t| t.texture);
+    }
+
+    pub fn scissor(&mut self, clip: Option<(i32, i32, i32, i32)>) {
+        self.state.clip = clip;
+    }
+
+    pub fn set_projection_matrix(&mut self, matrix: glam::Mat4) {
+        self.state.projection = matrix;
+    }
+
     pub fn push_model_matrix(&mut self, matrix: glam::Mat4) {
         self.state.model_stack.push(self.state.model() * matrix);
     }
