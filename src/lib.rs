@@ -56,22 +56,47 @@ struct DrawCall {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct Vertex {
-    x: f32,
-    y: f32,
-    z: f32,
-    u: f32,
-    v: f32,
+    pos: [f32; 3],
+    uv: [f32; 2],
     color: Color,
+}
+
+pub type VertexInterop = ([f32; 3], [f32; 2], [f32; 4]);
+
+impl Into<VertexInterop> for Vertex {
+    fn into(self) -> VertexInterop {
+        (
+            self.pos,
+            self.uv,
+            [
+                self.color.0[0] as f32 / 255.,
+                self.color.0[1] as f32 / 255.,
+                self.color.0[2] as f32 / 255.,
+                self.color.0[3] as f32 / 255.,
+            ],
+        )
+    }
+}
+impl Into<Vertex> for VertexInterop {
+    fn into(self) -> Vertex {
+        Vertex {
+            pos: self.0,
+            uv: self.1,
+            color: Color([
+                ((self.2)[0] * 255.) as u8,
+                ((self.2)[1] as f32 * 255.) as u8,
+                ((self.2)[2] as f32 * 255.) as u8,
+                ((self.2)[3] as f32 * 255.) as u8,
+            ]),
+        }
+    }
 }
 
 impl Vertex {
     pub fn new(x: f32, y: f32, z: f32, u: f32, v: f32, color: Color) -> Vertex {
         Vertex {
-            x,
-            y,
-            z,
-            u,
-            v,
+            pos: [x, y, z],
+            uv: [u, v],
             color,
         }
     }
@@ -252,7 +277,7 @@ impl QuadGl {
         }
     }
 
-    pub fn geometry(&mut self, vertices: &[Vertex], indices: &[u16]) {
+    pub fn geometry(&mut self, vertices: &[impl Into<VertexInterop> + Copy], indices: &[u16]) {
         let previous_dc_ix = if self.draw_calls_count == 0 {
             None
         } else {
@@ -287,7 +312,7 @@ impl QuadGl {
         let dc = &mut self.draw_calls[self.draw_calls_count - 1];
 
         for i in 0..vertices.len() {
-            dc.vertices[dc.vertices_count + i] = vertices[i];
+            dc.vertices[dc.vertices_count + i] = vertices[i].into().into();
         }
 
         for i in 0..indices.len() {
