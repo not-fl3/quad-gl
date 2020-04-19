@@ -2,6 +2,8 @@ use miniquad::*;
 
 pub use colors::*;
 
+pub use miniquad::FilterMode;
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Color(pub [u8; 4]);
@@ -382,6 +384,10 @@ impl Texture2D {
         let texture = miniquad::Texture::from_rgba8(ctx, width, height, &bytes);
 
         Texture2D { texture }
+    }
+
+    pub fn set_filter(&self, ctx: &mut miniquad::Context, filter_mode: FilterMode) {
+        self.texture.set_filter(ctx, filter_mode);
     }
 }
 
