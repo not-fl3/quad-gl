@@ -2,11 +2,33 @@ use miniquad::*;
 
 pub use colors::*;
 
-pub use miniquad::FilterMode;
+pub use miniquad::{FilterMode, ShaderError};
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Color(pub [u8; 4]);
+
+impl Into<[f32; 4]> for Color {
+    fn into(self) -> [f32; 4] {
+        [
+            self.0[0] as f32 / 255.,
+            self.0[1] as f32 / 255.,
+            self.0[2] as f32 / 255.,
+            self.0[3] as f32 / 255.,
+        ]
+    }
+}
+
+impl Color {
+    pub fn new(r: f32, g: f32, b: f32, a: f32) -> Color {
+        Color([
+            (r * 255.) as u8,
+            (g * 255.) as u8,
+            (b * 255.) as u8,
+            (a * 255.) as u8,
+        ])
+    }
+}
 
 pub mod colors {
     use super::Color;
@@ -41,6 +63,15 @@ pub mod colors {
 const MAX_VERTICES: usize = 10000;
 const MAX_INDICES: usize = 5000;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DrawMode {
+    Triangles,
+    Lines,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GlPipeline(usize);
+
 struct DrawCall {
     vertices: [Vertex; MAX_VERTICES],
     indices: [u16; MAX_INDICES],
@@ -53,10 +84,13 @@ struct DrawCall {
 
     model: glam::Mat4,
     projection: glam::Mat4,
+
+    draw_mode: DrawMode,
+    pipeline: GlPipeline,
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Vertex {
     pos: [f32; 3],
     uv: [f32; 2],
@@ -105,7 +139,13 @@ impl Vertex {
 }
 
 impl DrawCall {
-    fn new(texture: Texture, projection: glam::Mat4, model: glam::Mat4) -> DrawCall {
+    fn new(
+        texture: Texture,
+        projection: glam::Mat4,
+        model: glam::Mat4,
+        draw_mode: DrawMode,
+        pipeline: GlPipeline,
+    ) -> DrawCall {
         DrawCall {
             vertices: [Vertex::new(0., 0., 0., 0., 0., Color([0, 0, 0, 0])); MAX_VERTICES],
             indices: [0; MAX_INDICES],
@@ -115,6 +155,8 @@ impl DrawCall {
             texture,
             projection,
             model,
+            draw_mode,
+            pipeline,
         }
     }
 
@@ -129,9 +171,12 @@ impl DrawCall {
 
 struct GlState {
     texture: Texture,
+    draw_mode: DrawMode,
     clip: Option<(i32, i32, i32, i32)>,
     projection: glam::Mat4,
     model_stack: Vec<glam::Mat4>,
+    pipeline: Option<GlPipeline>,
+    depth_test_enable: bool,
 }
 
 impl GlState {
@@ -140,8 +185,125 @@ impl GlState {
     }
 }
 
+struct PipelinesStorage {
+    pipelines: [Option<Pipeline>; Self::MAX_PIPELINES],
+    pipelines_amount: usize,
+}
+
+impl PipelinesStorage {
+    const MAX_PIPELINES: usize = 32;
+    const TRIANGLES_PIPELINE: GlPipeline = GlPipeline(0);
+    const LINES_PIPELINE: GlPipeline = GlPipeline(1);
+    const TRIANGLES_DEPTH_PIPELINE: GlPipeline = GlPipeline(2);
+    const LINES_DEPTH_PIPELINE: GlPipeline = GlPipeline(3);
+
+    fn new(ctx: &mut miniquad::Context) -> PipelinesStorage {
+        let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::META)
+            .unwrap_or_else(|e| panic!(e));
+
+        let params = PipelineParams {
+            color_blend: Some(BlendState::new(
+                Equation::Add,
+                BlendFactor::Value(BlendValue::SourceAlpha),
+                BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
+            )),
+            ..Default::default()
+        };
+
+        let mut storage = PipelinesStorage {
+            pipelines: [None; Self::MAX_PIPELINES],
+            pipelines_amount: 0,
+        };
+
+        let triangles_pipeline = storage.make_pipeline(
+            ctx,
+            shader,
+            PipelineParams {
+                primitive_type: PrimitiveType::Triangles,
+                ..params
+            },
+        );
+        assert_eq!(triangles_pipeline, Self::TRIANGLES_PIPELINE);
+
+        let lines_pipeline = storage.make_pipeline(
+            ctx,
+            shader,
+            PipelineParams {
+                primitive_type: PrimitiveType::Lines,
+                ..params
+            },
+        );
+        assert_eq!(lines_pipeline, Self::LINES_PIPELINE);
+
+        let triangles_depth_pipeline = storage.make_pipeline(
+            ctx,
+            shader,
+            PipelineParams {
+                depth_write: true,
+                depth_test: Comparison::LessOrEqual,
+                primitive_type: PrimitiveType::Triangles,
+                ..params
+            },
+        );
+        assert_eq!(triangles_depth_pipeline, Self::TRIANGLES_DEPTH_PIPELINE);
+
+        let lines_depth_pipeline = storage.make_pipeline(
+            ctx,
+            shader,
+            PipelineParams {
+                depth_write: true,
+                depth_test: Comparison::LessOrEqual,
+                primitive_type: PrimitiveType::Lines,
+                ..params
+            },
+        );
+        assert_eq!(lines_depth_pipeline, Self::LINES_DEPTH_PIPELINE);
+
+        storage
+    }
+
+    fn make_pipeline(
+        &mut self,
+        ctx: &mut Context,
+        shader: Shader,
+        params: PipelineParams,
+    ) -> GlPipeline {
+        let pipeline = Pipeline::with_params(
+            ctx,
+            &[BufferLayout::default()],
+            &[
+                VertexAttribute::new("position", VertexFormat::Float3),
+                VertexAttribute::new("texcoord", VertexFormat::Float2),
+                VertexAttribute::new("color0", VertexFormat::Byte4),
+            ],
+            shader,
+            params,
+        );
+
+        let id = self.pipelines_amount;
+
+        self.pipelines[id] = Some(pipeline);
+        self.pipelines_amount += 1;
+
+        GlPipeline(id)
+    }
+
+    fn get(&self, draw_mode: DrawMode, depth_enabled: bool) -> GlPipeline {
+        match (draw_mode, depth_enabled) {
+            (DrawMode::Triangles, false) => Self::TRIANGLES_PIPELINE,
+            (DrawMode::Triangles, true) => Self::TRIANGLES_DEPTH_PIPELINE,
+            (DrawMode::Lines, false) => Self::LINES_PIPELINE,
+            (DrawMode::Lines, true) => Self::LINES_DEPTH_PIPELINE,
+        }
+    }
+
+    fn get_quad_pipeline(&self, pip: GlPipeline) -> &Pipeline {
+        self.pipelines[pip.0].as_ref().unwrap()
+    }
+}
+
 pub struct QuadGl {
-    pipeline: Pipeline,
+    pipelines: PipelinesStorage,
 
     draw_calls: Vec<DrawCall>,
     draw_calls_bindings: Vec<Bindings>,
@@ -153,42 +315,35 @@ pub struct QuadGl {
 
 impl QuadGl {
     pub fn new(ctx: &mut miniquad::Context) -> QuadGl {
-        let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::META);
-
-        let pipeline = Pipeline::with_params(
-            ctx,
-            &[BufferLayout::default()],
-            &[
-                VertexAttribute::new("position", VertexFormat::Float3),
-                VertexAttribute::new("texcoord", VertexFormat::Float2),
-                VertexAttribute::new("color0", VertexFormat::Byte4),
-            ],
-            shader,
-            PipelineParams {
-                color_blend: Some((
-                    Equation::Add,
-                    BlendFactor::Value(BlendValue::SourceAlpha),
-                    BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
-                )),
-                ..Default::default()
-            },
-        );
-
         let white_texture = Texture::from_rgba8(ctx, 1, 1, &[255, 255, 255, 255]);
 
         QuadGl {
-            pipeline,
+            pipelines: PipelinesStorage::new(ctx),
             state: GlState {
                 clip: None,
                 texture: white_texture,
                 projection: glam::Mat4::identity(),
                 model_stack: vec![glam::Mat4::identity()],
+                draw_mode: DrawMode::Triangles,
+                pipeline: None,
+                depth_test_enable: false,
             },
             draw_calls: Vec::with_capacity(200),
             draw_calls_bindings: Vec::with_capacity(200),
             draw_calls_count: 0,
             white_texture,
         }
+    }
+
+    pub fn make_pipeline(
+        &mut self,
+        ctx: &mut Context,
+        fragment_shader: &str,
+        vertex_shader: &str,
+        params: PipelineParams,
+    ) -> Result<GlPipeline, ShaderError> {
+        let shader = Shader::new(ctx, fragment_shader, vertex_shader, shader::META)?;
+        Ok(self.pipelines.make_pipeline(ctx, shader, params))
     }
 
     /// Reset internal state to known default
@@ -235,7 +390,7 @@ impl QuadGl {
             bindings.index_buffer.update(ctx, dc.indices());
             bindings.images = vec![dc.texture];
 
-            ctx.apply_pipeline(&self.pipeline);
+            ctx.apply_pipeline(self.pipelines.get_quad_pipeline(dc.pipeline));
             if let Some(clip) = dc.clip {
                 ctx.apply_scissor_rect(clip.0, height as i32 - (clip.1 + clip.3), clip.2, clip.3);
             } else {
@@ -255,6 +410,10 @@ impl QuadGl {
         ctx.end_render_pass();
 
         self.draw_calls_count = 0;
+    }
+
+    pub fn depth_test(&mut self, enable: bool) {
+        self.state.depth_test_enable = enable;
     }
 
     pub fn texture(&mut self, texture: Option<Texture2D>) {
@@ -279,7 +438,20 @@ impl QuadGl {
         }
     }
 
+    pub fn pipeline(&mut self, pipeline: Option<GlPipeline>) {
+        self.state.pipeline = pipeline;
+    }
+
+    pub fn draw_mode(&mut self, mode: DrawMode) {
+        self.state.draw_mode = mode;
+    }
+
     pub fn geometry(&mut self, vertices: &[impl Into<VertexInterop> + Copy], indices: &[u16]) {
+        let pip = self.state.pipeline.unwrap_or(
+            self.pipelines
+                .get(self.state.draw_mode, self.state.depth_test_enable),
+        );
+
         let previous_dc_ix = if self.draw_calls_count == 0 {
             None
         } else {
@@ -291,6 +463,8 @@ impl QuadGl {
             draw_call.texture != self.state.texture
                 || draw_call.clip != self.state.clip
                 || draw_call.model != self.state.model()
+                || draw_call.pipeline != pip
+                || draw_call.draw_mode != self.state.draw_mode
                 || draw_call.projection != self.state.projection
                 || draw_call.vertices_count >= MAX_VERTICES - vertices.len()
                 || draw_call.indices_count >= MAX_INDICES - indices.len()
@@ -300,6 +474,8 @@ impl QuadGl {
                     self.state.texture,
                     self.state.projection,
                     self.state.model(),
+                    self.state.draw_mode,
+                    pip,
                 ));
             }
             self.draw_calls[self.draw_calls_count].texture = self.state.texture;
@@ -308,6 +484,7 @@ impl QuadGl {
             self.draw_calls[self.draw_calls_count].clip = self.state.clip;
             self.draw_calls[self.draw_calls_count].projection = self.state.projection;
             self.draw_calls[self.draw_calls_count].model = self.state.model();
+            self.draw_calls[self.draw_calls_count].pipeline = pip;
 
             self.draw_calls_count += 1;
         };
@@ -452,7 +629,7 @@ impl Image {
 }
 
 mod shader {
-    use miniquad::{ShaderMeta, UniformBlockLayout, UniformType};
+    use miniquad::{ShaderMeta, UniformBlockLayout, UniformDesc, UniformType};
 
     pub const VERTEX: &str = r#"#version 100
     attribute vec3 position;
@@ -485,8 +662,8 @@ mod shader {
         images: &["Texture"],
         uniforms: UniformBlockLayout {
             uniforms: &[
-                ("Projection", UniformType::Mat4),
-                ("Model", UniformType::Mat4),
+                UniformDesc::new("Projection", UniformType::Mat4),
+                UniformDesc::new("Model", UniformType::Mat4),
             ],
         },
     };
