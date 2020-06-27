@@ -94,7 +94,9 @@ checksum = "99e85c08494b21a9054e7fe1374a732aeadaff3980b6990b94bfd3a70f690005"
 
 [[package]]
 name = "miniquad"
-version = "0.3.0-alpha.5"
+version = "0.3.0-alpha.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bba20f44230215fae81003b8ad51022e4fe627786aac88e610b95feb71b0a197"
 dependencies = [
  "sapp-android",
  "sapp-darwin",
@@ -159,7 +161,7 @@ dependencies = [
 
 [[package]]
 name = "quad-gl"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "glam",
  "image",
@@ -169,6 +171,8 @@ dependencies = [
 [[package]]
 name = "sapp-android"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06d01e1740c3c409f1fff64bff83a86fd02c47514a3f370caa45cf5c65ab6f6b"
 dependencies = [
  "cc",
  "libc",
@@ -177,6 +181,8 @@ dependencies = [
 [[package]]
 name = "sapp-darwin"
 version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "011e764a379302de761892ad9a0de6e5d612146423b39ddee125fb1cb2ffcb73"
 dependencies = [
  "cc",
  "libc",
@@ -185,24 +191,32 @@ dependencies = [
 [[package]]
 name = "sapp-dummy"
 version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "844086b04fc920b4b604af0bb6ffc5c3b43dbb4fe94fd6f532c41a391e12f717"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "sapp-linux"
-version = "0.1.7"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f375ce42d40696ab27c5cbf410580e991ebf520cb7eb085df1b73c17bf53a69"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "sapp-wasm"
-version = "0.1.16"
+version = "0.1.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4bc4bc1e5193e62ef8f3185a82d0e0416581b67d9ae0f02ef53c9ad54653689"
 
 [[package]]
 name = "sapp-windows"
-version = "0.2.8"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68e7ace3bb21c750c1a47fb97a39e41d7cd795ab16c9a2da7103255a862d623f"
 dependencies = [
  "cc",
  "libc",

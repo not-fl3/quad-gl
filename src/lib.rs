@@ -22,10 +22,10 @@ impl Into<[f32; 4]> for Color {
 impl Color {
     pub fn new(r: f32, g: f32, b: f32, a: f32) -> Color {
         Color([
-            (r * 255.) as u8,
-            (g * 255.) as u8,
-            (b * 255.) as u8,
-            (a * 255.) as u8,
+            (r.min(1.).max(0.) * 255.) as u8,
+            (g.min(1.).max(0.) * 255.) as u8,
+            (b.min(1.).max(0.) * 255.) as u8,
+            (a.min(1.).max(0.) * 255.) as u8,
         ])
     }
 }
