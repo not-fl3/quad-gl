@@ -87,6 +87,7 @@ struct DrawCall {
 
     draw_mode: DrawMode,
     pipeline: GlPipeline,
+    render_pass: Option<RenderPass>,
 }
 
 #[repr(C)]
@@ -145,6 +146,7 @@ impl DrawCall {
         model: glam::Mat4,
         draw_mode: DrawMode,
         pipeline: GlPipeline,
+        render_pass: Option<RenderPass>,
     ) -> DrawCall {
         DrawCall {
             vertices: [Vertex::new(0., 0., 0., 0., 0., Color([0, 0, 0, 0])); MAX_VERTICES],
@@ -157,6 +159,7 @@ impl DrawCall {
             model,
             draw_mode,
             pipeline,
+            render_pass,
         }
     }
 
@@ -177,6 +180,7 @@ struct GlState {
     model_stack: Vec<glam::Mat4>,
     pipeline: Option<GlPipeline>,
     depth_test_enable: bool,
+    render_pass: Option<RenderPass>,
 }
 
 impl GlState {
@@ -327,6 +331,7 @@ impl QuadGl {
                 draw_mode: DrawMode::Triangles,
                 pipeline: None,
                 depth_test_enable: false,
+                render_pass: None,
             },
             draw_calls: Vec::with_capacity(200),
             draw_calls_bindings: Vec::with_capacity(200),
@@ -344,6 +349,11 @@ impl QuadGl {
     ) -> Result<GlPipeline, ShaderError> {
         let shader = Shader::new(ctx, fragment_shader, vertex_shader, shader::META)?;
         Ok(self.pipelines.make_pipeline(ctx, shader, params))
+    }
+
+    /// Reset only draw calls state
+    pub fn clear_draw_calls(&mut self) {
+        self.draw_calls_count = 0;
     }
 
     /// Reset internal state to known default
@@ -370,7 +380,7 @@ impl QuadGl {
             );
             let bindings = Bindings {
                 vertex_buffers: vec![vertex_buffer],
-                index_buffer: index_buffer,
+                index_buffer,
                 images: vec![],
             };
 
@@ -378,14 +388,18 @@ impl QuadGl {
         }
         assert_eq!(self.draw_calls_bindings.len(), self.draw_calls.len());
 
-        ctx.begin_default_pass(PassAction::Nothing);
-
         let (width, height) = ctx.screen_size();
 
         for (dc, bindings) in self.draw_calls[0..self.draw_calls_count]
             .iter_mut()
             .zip(self.draw_calls_bindings.iter_mut())
         {
+            if let Some(render_pass) = dc.render_pass {
+                ctx.begin_pass(render_pass, PassAction::Nothing);
+            } else {
+                ctx.begin_default_pass(PassAction::Nothing);
+            }
+
             bindings.vertex_buffers[0].update(ctx, dc.vertices());
             bindings.index_buffer.update(ctx, dc.indices());
             bindings.images = vec![dc.texture];
@@ -405,11 +419,15 @@ impl QuadGl {
 
             dc.vertices_count = 0;
             dc.indices_count = 0;
+
+            ctx.end_render_pass();
         }
 
-        ctx.end_render_pass();
-
         self.draw_calls_count = 0;
+    }
+
+    pub fn render_pass(&mut self, render_pass: Option<RenderPass>) {
+        self.state.render_pass = render_pass;
     }
 
     pub fn depth_test(&mut self, enable: bool) {
@@ -464,6 +482,7 @@ impl QuadGl {
                 || draw_call.clip != self.state.clip
                 || draw_call.model != self.state.model()
                 || draw_call.pipeline != pip
+                || draw_call.render_pass != self.state.render_pass
                 || draw_call.draw_mode != self.state.draw_mode
                 || draw_call.projection != self.state.projection
                 || draw_call.vertices_count >= MAX_VERTICES - vertices.len()
@@ -476,6 +495,7 @@ impl QuadGl {
                     self.state.model(),
                     self.state.draw_mode,
                     pip,
+                    self.state.render_pass,
                 ));
             }
             self.draw_calls[self.draw_calls_count].texture = self.state.texture;
@@ -485,6 +505,7 @@ impl QuadGl {
             self.draw_calls[self.draw_calls_count].projection = self.state.projection;
             self.draw_calls[self.draw_calls_count].model = self.state.model();
             self.draw_calls[self.draw_calls_count].pipeline = pip;
+            self.draw_calls[self.draw_calls_count].render_pass = self.state.render_pass;
 
             self.draw_calls_count += 1;
         };
@@ -510,6 +531,10 @@ pub struct Texture2D {
 }
 
 impl Texture2D {
+    pub fn from_miniquad_texture(texture: miniquad::Texture) -> Texture2D {
+        Texture2D { texture }
+    }
+
     pub fn empty() -> Texture2D {
         Texture2D {
             texture: miniquad::Texture::empty(),
