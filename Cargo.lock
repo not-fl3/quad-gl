@@ -2,15 +2,15 @@
 # It is not intended for manual editing.
 [[package]]
 name = "adler32"
-version = "1.0.4"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d2e7343e7fc9de883d1b0341e0b13970f764c14101234857d2ddafa1cb1cac2"
+checksum = "aae1277d39aeec15cb388266ecc24b11c80469deae6067e17a1a7aa9e5c1f234"
 
 [[package]]
 name = "autocfg"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
+checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
 name = "bitflags"
@@ -26,9 +26,9 @@ checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
 
 [[package]]
 name = "cc"
-version = "1.0.50"
+version = "1.0.59"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95e28fa049fda1c330bcf9d723be7663a899c4679724b34c81e9f5a326aab8cd"
+checksum = "66120af515773fb005778dc07c261bd201ec8ce50bd6e7144c927753fe013381"
 
 [[package]]
 name = "cfg-if"
@@ -57,12 +57,9 @@ dependencies = [
 
 [[package]]
 name = "glam"
-version = "0.8.6"
+version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7eebc7285e5b49657375fdbf7cb7b8bcb296eb031744455c08850fdc1711644"
-dependencies = [
- "cfg-if",
-]
+checksum = "b00572b5b10070ac495be20a25b4c8d379d20bcdec8ea0c870022b620ec79b20"
 
 [[package]]
 name = "image"
@@ -88,19 +85,20 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.69"
+version = "0.2.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99e85c08494b21a9054e7fe1374a732aeadaff3980b6990b94bfd3a70f690005"
+checksum = "755456fae044e6fa1ebbbd1b3e902ae19e73097ed4ed87bb79934a867c007bc3"
 
 [[package]]
 name = "miniquad"
-version = "0.3.0-alpha.10"
+version = "0.3.0-alpha.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bba20f44230215fae81003b8ad51022e4fe627786aac88e610b95feb71b0a197"
+checksum = "6d79a083ea2eb96633db8987da0079147442161b13f75d9881fa0bcda980955c"
 dependencies = [
  "sapp-android",
  "sapp-darwin",
  "sapp-dummy",
+ "sapp-ios",
  "sapp-linux",
  "sapp-wasm",
  "sapp-windows",
@@ -108,9 +106,9 @@ dependencies = [
 
 [[package]]
 name = "num-integer"
-version = "0.1.42"
+version = "0.1.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f6ea62e9d81a77cd3ee9a2a5b9b609447857f3d358704331e4ef39eb247fcba"
+checksum = "8d59457e662d541ba17869cf51cf177c0b5f0cbf476c66bdc90bf1edac4f875b"
 dependencies = [
  "autocfg",
  "num-traits",
@@ -118,9 +116,9 @@ dependencies = [
 
 [[package]]
 name = "num-iter"
-version = "0.1.40"
+version = "0.1.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfb0800a0291891dd9f4fe7bd9c19384f98f7fbe0cd0f39a2c6b88b9868bbc00"
+checksum = "7a6e6b7c748f995c4c29c5f5ae0248536e04a5739927c74ec0fa564805094b9f"
 dependencies = [
  "autocfg",
  "num-integer",
@@ -140,9 +138,9 @@ dependencies = [
 
 [[package]]
 name = "num-traits"
-version = "0.2.11"
+version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c62be47e61d1842b9170f0fdeec8eba98e60e90e5446449a0545e5152acd7096"
+checksum = "ac267bcc07f48ee5f8935ab0d24f316fb722d7a1292e2913f0cc196b29ffd611"
 dependencies = [
  "autocfg",
 ]
@@ -161,7 +159,7 @@ dependencies = [
 
 [[package]]
 name = "quad-gl"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "glam",
  "image",
@@ -170,9 +168,9 @@ dependencies = [
 
 [[package]]
 name = "sapp-android"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06d01e1740c3c409f1fff64bff83a86fd02c47514a3f370caa45cf5c65ab6f6b"
+checksum = "d5547ac47995d3c38e80f1ee5b0794c04090e67f6703878fb0008539a91dbc70"
 dependencies = [
  "cc",
  "libc",
@@ -194,6 +192,16 @@ version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "844086b04fc920b4b604af0bb6ffc5c3b43dbb4fe94fd6f532c41a391e12f717"
 dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "sapp-ios"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0984c8ba4ce61891faaee70ada810da57a17a5690bc29a86770f885cf389090"
+dependencies = [
+ "cc",
  "libc",
 ]
 

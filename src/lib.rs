@@ -388,12 +388,19 @@ impl QuadGl {
         }
         assert_eq!(self.draw_calls_bindings.len(), self.draw_calls.len());
 
-        let (width, height) = ctx.screen_size();
+        let (screen_width, screen_height) = ctx.screen_size();
 
         for (dc, bindings) in self.draw_calls[0..self.draw_calls_count]
             .iter_mut()
             .zip(self.draw_calls_bindings.iter_mut())
         {
+            let (width, height) = if let Some(render_pass) = dc.render_pass {
+                let render_texture = render_pass.texture(ctx);
+
+                (render_texture.width, render_texture.height)
+            } else {
+                (screen_width as u32, screen_height as u32)
+            };
             if let Some(render_pass) = dc.render_pass {
                 ctx.begin_pass(render_pass, PassAction::Nothing);
             } else {
