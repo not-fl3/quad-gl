@@ -16,6 +16,10 @@ pub mod text;
 pub mod texture;
 pub mod ui;
 
+// ERIC
+// I found some rounded rect code in a macroquad Pr
+pub mod rounded_rect;
+
 pub mod telemetry;
 
 mod cubemap;
@@ -79,6 +83,27 @@ impl Context3 {
     pub fn new_canvas(&self) -> sprite_batcher::SpriteBatcher {
         sprite_batcher::SpriteBatcher::new(self.quad_ctx.clone(), self.fonts_storage.clone())
     }
+
+    // ERIC
+    // I found this function in text.rs, commented out.
+    // This seems like a decent place for it to go?
+    pub fn load_ttf_font_from_bytes(
+        &self,
+        bytes: &[u8]
+        ) -> Result<crate::text::Font, Error>
+    {
+        let atlas = Arc::new(Mutex::new(crate::text::atlas::Atlas::new(
+            self.quad_ctx.lock().unwrap().as_mut(),
+            miniquad::FilterMode::Linear,
+        )));
+
+        let mut font = crate::text::Font::load_from_bytes(atlas.clone(), bytes)?;
+
+        font.populate_font_cache(&crate::text::Font::ascii_character_list(), 15);
+
+        Ok(font)
+    }
+
 }
 
 // pub fn start<F: Fn(Context3) -> Fut + 'static, Fut: Future<Output = ()> + 'static>(

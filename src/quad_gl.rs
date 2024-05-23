@@ -37,7 +37,9 @@ struct DrawCall {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Vertex {
-    pos: [f32; 3],
+    // ERIC
+    // the rounded rect code wants this to be less-private.
+    pub(crate) pos: [f32; 3],
     uv: [f32; 2],
     color: [u8; 4],
 }

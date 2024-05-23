@@ -122,7 +122,23 @@ impl Font {
             .cloned()
     }
 
-    pub(crate) fn measure_text(
+    // ERIC:
+    // In my fork, I made measure_text() public so that I can do text
+    // layout separately from my draw code.
+    //
+    // Also, I made a version which has just one font_scale parameter
+    // instead of separate ones for x and y.  I'm including that change
+    // here only so that I can isolate changes for now.
+    pub fn measure_text(
+        &self,
+        text: &str,
+        font_size: u16,
+        font_scale: f32,
+    ) -> TextDimensions {
+        self.measure_text_ex(text, font_size, font_scale, font_scale)
+    }
+
+    pub fn measure_text_ex(
         &self,
         text: &str,
         font_size: u16,

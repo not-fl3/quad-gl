@@ -9,20 +9,21 @@ use crate::{
 };
 
 impl SpriteBatcher {
-    // pub fn draw_triangle(v1: Vec2, v2: Vec2, v3: Vec2, color: Color) {
-    //     let context = get_context();
+    // ERIC
+    // I un-commented this function and fixed it.
+    // Seems to work.
+    pub fn draw_triangle(&mut self, v1: Vec2, v2: Vec2, v3: Vec2, color: Color) {
+        let mut vertices = Vec::<Vertex>::with_capacity(3);
 
-    //     let mut vertices = Vec::<Vertex>::with_capacity(3);
+        vertices.push(Vertex::new(v1.x, v1.y, 0., 0., 0., color));
+        vertices.push(Vertex::new(v2.x, v2.y, 0., 0., 0., color));
+        vertices.push(Vertex::new(v3.x, v3.y, 0., 0., 0., color));
+        let indices: [u16; 3] = [0, 1, 2];
 
-    //     vertices.push(Vertex::new(v1.x, v1.y, 0., 0., 0., color));
-    //     vertices.push(Vertex::new(v2.x, v2.y, 0., 0., 0., color));
-    //     vertices.push(Vertex::new(v3.x, v3.y, 0., 0., 0., color));
-    //     let indices: [u16; 3] = [0, 1, 2];
-
-    //     context.gl.texture(None);
-    //     context.gl.draw_mode(DrawMode::Triangles);
-    //     context.gl.geometry(&vertices, &indices);
-    // }
+        self.gl().texture(None);
+        self.gl().draw_mode(DrawMode::Triangles);
+        self.gl().geometry(&vertices, &indices);
+    }
 
     // pub fn draw_triangle_lines(v1: Vec2, v2: Vec2, v3: Vec2, thickness: f32, color: Color) {
     //     draw_line(v1.x, v1.y, v2.x, v2.y, thickness, color);

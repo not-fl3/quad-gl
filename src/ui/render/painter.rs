@@ -312,7 +312,9 @@ impl Painter {
         font: &mut Font,
         font_size: u16,
     ) -> TextDimensions {
-        font.measure_text(label, font_size, 1.0, 1.0)
+        // ERIC
+        // I renamed the non-public version of measure_text
+        font.measure_text_ex(label, font_size, 1.0, 1.0)
     }
 
     /// If character is in font atlas - will return x advance from position to potential next character position
