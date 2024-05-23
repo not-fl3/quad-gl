@@ -71,4 +71,13 @@ impl SpriteBatcher {
             camera.render_target.clone().map(|t| t.render_pass),
         );
     }
+
+    // ERIC
+    // I needed something like this method to get high dpi to work.
+    pub fn draw3(&mut self, mat: crate::math::Mat4)
+    {
+        let mut ctx = self.quad_ctx.lock().unwrap();
+        self.quad_gl.draw(&mut **ctx, mat, None);
+    }
+
 }
