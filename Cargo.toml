@@ -18,7 +18,7 @@ opt-level = 3
 all-features = true
 
 [dependencies]
-miniquad = { version = "=0.4.0", features = ["log-impl"] }
+miniquad = { version = "=0.4.1", features = ["log-impl"] }
 glam = {version = "0.24", features = ["scalar-math","mint"] }
 fontdue = { git = "https://github.com/not-fl3/fontdue.git", default-features = false, features = ["std"] }
 backtrace = { version = "0.3.60", optional = true, default-features = false, features = [ "std", "libbacktrace" ] }
@@ -36,7 +36,7 @@ dolly = "*"
 
 [patch.crates-io]
 #quad-snd = {path = '../quad-snd'}
-#miniquad = { path = '../miniquad' }
+miniquad = { path = '../miniquad' }
 #fontdue = { git = '../fontdue' }
 #quad-gl = {path = './quad-gl'}
 #zune-jpeg = { path = "../zune-image/zune-jpeg" }

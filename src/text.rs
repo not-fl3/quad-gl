@@ -296,8 +296,7 @@ impl<'a> Default for TextParams<'a> {
 impl SpriteBatcher {
     /// Draw text with given font_size
     pub fn draw_text(&mut self, text: &str, x: f32, y: f32, font_size: f32, color: Color) {
-        draw_text_ex(
-            self,
+        self.draw_text_ex(
             text,
             x,
             y,
@@ -309,83 +308,79 @@ impl SpriteBatcher {
             },
         )
     }
-}
 
-/// Draw text with custom params such as font, font size and font scale.
-pub fn draw_text_ex(
-    sprite_batcher: &mut SpriteBatcher,
-    text: &str,
-    x: f32,
-    y: f32,
-    params: TextParams,
-) {
-    let font = {
-        let fonts = sprite_batcher.fonts_storage.lock().unwrap();
-        params.font.unwrap_or_else(|| &fonts.default_font).clone()
-    };
-
-    let font_scale_x = params.font_scale * params.font_scale_aspect;
-    let font_scale_y = params.font_scale;
-    let dpi_scaling = miniquad::window::dpi_scale();
-
-    let font_size = (params.font_size as f32 * dpi_scaling).ceil() as u16;
-
-    let mut total_width = 0.;
-    for character in text.chars() {
-        if !font
-            .characters
-            .lock()
-            .unwrap()
-            .contains_key(&(character, font_size))
-        {
-            font.cache_glyph(character, font_size);
-        }
-        let mut atlas = font.atlas.lock().unwrap();
-        let font_data = &font.characters.lock().unwrap()[&(character, font_size)];
-        let glyph = atlas.get(font_data.sprite).unwrap().rect;
-        let angle_rad = params.rotation;
-        let left_coord = (font_data.offset_x as f32 * font_scale_x + total_width) * angle_rad.cos()
-            + (glyph.h as f32 * font_scale_y + font_data.offset_y as f32 * font_scale_y)
-                * angle_rad.sin();
-        let top_coord = (font_data.offset_x as f32 * font_scale_x + total_width) * angle_rad.sin()
-            + (0.0 - glyph.h as f32 * font_scale_y - font_data.offset_y as f32 * font_scale_y)
-                * angle_rad.cos();
-
-        total_width += font_data.advance * font_scale_x;
-
-        let dest = Rect::new(
-            left_coord / dpi_scaling as f32 + x,
-            top_coord / dpi_scaling as f32 + y,
-            glyph.w as f32 / dpi_scaling as f32 * font_scale_x,
-            glyph.h as f32 / dpi_scaling as f32 * font_scale_y,
-        );
-
-        let source = Rect::new(
-            glyph.x as f32,
-            glyph.y as f32,
-            glyph.w as f32,
-            glyph.h as f32,
-        );
-
-        let texture = {
-            let mut ctx = sprite_batcher.quad_ctx.lock().unwrap();
-            atlas.texture(&mut **ctx)
+    /// Draw text with custom params such as font, font size and font scale.
+    pub fn draw_text_ex(&mut self, text: &str, x: f32, y: f32, params: TextParams) {
+        let font = {
+            let fonts = self.fonts_storage.lock().unwrap();
+            params.font.unwrap_or_else(|| &fonts.default_font).clone()
         };
-        sprite_batcher.draw_texture_ex(
-            &crate::texture::Texture2D {
-                texture: TextureHandle::Unmanaged(texture),
-            },
-            dest.x,
-            dest.y,
-            params.color,
-            crate::texture::DrawTextureParams {
-                dest_size: Some(vec2(dest.w, dest.h)),
-                source: Some(source),
-                rotation: angle_rad,
-                pivot: Option::Some(vec2(dest.x, dest.y)),
-                ..Default::default()
-            },
-        );
+
+        let font_scale_x = params.font_scale * params.font_scale_aspect;
+        let font_scale_y = params.font_scale;
+        let dpi_scaling = miniquad::window::dpi_scale();
+
+        let font_size = (params.font_size as f32 * dpi_scaling).ceil() as u16;
+
+        let mut total_width = 0.;
+        for character in text.chars() {
+            if !font
+                .characters
+                .lock()
+                .unwrap()
+                .contains_key(&(character, font_size))
+            {
+                font.cache_glyph(character, font_size);
+            }
+            let mut atlas = font.atlas.lock().unwrap();
+            let font_data = &font.characters.lock().unwrap()[&(character, font_size)];
+            let glyph = atlas.get(font_data.sprite).unwrap().rect;
+            let angle_rad = params.rotation;
+            let left_coord = (font_data.offset_x as f32 * font_scale_x + total_width)
+                * angle_rad.cos()
+                + (glyph.h as f32 * font_scale_y + font_data.offset_y as f32 * font_scale_y)
+                    * angle_rad.sin();
+            let top_coord = (font_data.offset_x as f32 * font_scale_x + total_width)
+                * angle_rad.sin()
+                + (0.0 - glyph.h as f32 * font_scale_y - font_data.offset_y as f32 * font_scale_y)
+                    * angle_rad.cos();
+
+            total_width += font_data.advance * font_scale_x;
+
+            let dest = Rect::new(
+                left_coord / dpi_scaling as f32 + x,
+                top_coord / dpi_scaling as f32 + y,
+                glyph.w as f32 / dpi_scaling as f32 * font_scale_x,
+                glyph.h as f32 / dpi_scaling as f32 * font_scale_y,
+            );
+
+            let source = Rect::new(
+                glyph.x as f32,
+                glyph.y as f32,
+                glyph.w as f32,
+                glyph.h as f32,
+            );
+
+            let texture = {
+                let mut ctx = self.quad_ctx.lock().unwrap();
+                atlas.texture(&mut **ctx)
+            };
+            self.draw_texture_ex(
+                &crate::texture::Texture2D {
+                    texture: TextureHandle::Unmanaged(texture),
+                },
+                dest.x,
+                dest.y,
+                params.color,
+                crate::texture::DrawTextureParams {
+                    dest_size: Some(vec2(dest.w, dest.h)),
+                    source: Some(source),
+                    rotation: angle_rad,
+                    pivot: Option::Some(vec2(dest.x, dest.y)),
+                    ..Default::default()
+                },
+            );
+        }
     }
 }
 

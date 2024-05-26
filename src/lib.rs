@@ -105,16 +105,3 @@ impl Context3 {
     }
 
 }
-
-// pub fn start<F: Fn(Context3) -> Fut + 'static, Fut: Future<Output = ()> + 'static>(
-//     mut config: conf::Conf,
-//     future: F,
-// ) {
-//     miniquad::start(conf::Conf { ..config }, move || {
-//         let ctx = Context3::new();
-//         Box::new(Stage {
-//             main_future: Some(Box::pin(future(ctx.clone()))),
-//             ctx: Arc::new(ctx),
-//         })
-//     });
-// }
