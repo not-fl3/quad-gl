@@ -235,7 +235,11 @@ impl crate::Context3 {
                     ctx.new_buffer(BufferType::IndexBuffer, BufferUsage::Immutable, unsafe {
                         BufferSource::pointer(indices.as_ptr(), indices.len(), 2)
                     });
-
+                let instancing = vec![vec3(0.0, 0.0, 0.0)];
+                let instancing_buffer =
+                    ctx.new_buffer(BufferType::VertexBuffer, BufferUsage::Immutable, unsafe {
+                        BufferSource::slice(&instancing[..])
+                    });
                 let mut defines = vec![];
                 if normal_texture.is_some() {
                     defines.push("HAS_NORMAL_MAP".to_string());
@@ -256,7 +260,7 @@ impl crate::Context3 {
                 .unwrap();
                 let shader = shadermagic::choose_appropriate_shader(&shader, &ctx.info());
                 if let miniquad::ShaderSource::Glsl { fragment, vertex } = shader {
-                    //println!("{}", vertex);
+                    //miniquad::warn!("{}", vertex);
                 };
                 let shader = ctx
                     .new_shader(shader, shader::meta())
@@ -267,11 +271,16 @@ impl crate::Context3 {
                         BufferLayout::default(),
                         BufferLayout::default(),
                         BufferLayout::default(),
+                        BufferLayout {
+                            step_func: VertexStep::PerInstance,
+                            ..Default::default()
+                        },
                     ],
                     &[
                         VertexAttribute::with_buffer("in_position", VertexFormat::Float3, 0),
                         VertexAttribute::with_buffer("in_uv", VertexFormat::Float2, 1),
                         VertexAttribute::with_buffer("in_normal", VertexFormat::Float3, 2),
+                        VertexAttribute::with_buffer("in_inst", VertexFormat::Float3, 3),
                     ],
                     shader,
                     PipelineParams {
@@ -290,7 +299,12 @@ impl crate::Context3 {
                 bindings.push(NodeData {
                     pipeline,
                     color,
-                    vertex_buffers: vec![vertex_buffer, uvs_buffer, normals_buffer],
+                    vertex_buffers: vec![
+                        vertex_buffer,
+                        uvs_buffer,
+                        normals_buffer,
+                        instancing_buffer,
+                    ],
                     index_buffer,
                     base_color_texture,
                     emissive_texture,
@@ -404,6 +418,25 @@ impl Scene {
         self.models[h.0].transform.rotation
     }
 
+    pub fn update_multi_positions(&mut self, h: &ModelHandle, positions: &[Vec3]) {
+        let mut model = &mut self.models[h.0];
+        let mut ctx = self.quad_ctx.lock().unwrap();
+        for mut child in &mut model.model.nodes {
+            for mut bindings in &mut child.data {
+                let old_vec_size = ctx.buffer_size(bindings.vertex_buffers[3]) as i32 / 12;
+                let new_vec_size = positions.len();
+                if old_vec_size != new_vec_size as i32 {
+                    bindings.vertex_buffers[3] =
+                        ctx.new_buffer(BufferType::VertexBuffer, BufferUsage::Stream, unsafe {
+                            BufferSource::slice(positions)
+                        });
+                } else {
+                    ctx.buffer_update(bindings.vertex_buffers[3], BufferSource::slice(positions));
+                }
+            }
+        }
+    }
+
     pub fn update_child(&mut self, h: &ModelHandle, name: &str, f: impl Fn(&mut Transform)) {
         let model = &mut self.models[h.0];
         for child in &mut model.model.nodes {
@@ -480,6 +513,7 @@ impl Scene {
     pub fn add_shadow_caster(&mut self, shadow_caster: ShadowCaster) {
         self.shadow_casters.push(shadow_caster);
     }
+
     pub fn add_model(&mut self, model: &Model) -> ModelHandle {
         self.models.push(Model2 {
             model: model.clone(),
@@ -492,6 +526,20 @@ impl Scene {
         });
         ModelHandle(self.models.len() - 1)
     }
+
+    // pub fn add_multi_model(&mut self, model: &Model, multi_position: Vec<Vec3>) -> ModelHandle {
+    //     self.models.push(Model2 {
+    //         model: model.clone(),
+    //         transform: Transform {
+    //             translation: vec3(0.0, 0.0, 0.0),
+    //             scale: vec3(1., 1., 1.),
+    //             rotation: Quat::IDENTITY,
+    //         },
+    //         world_aabb: model.aabb,
+    //         multi_position: Some(multi_position),
+    //     });
+    //     ModelHandle(self.models.len() - 1)
+    // }
 
     // pub fn fullscreen_canvas(&self, ix: usize) -> sprite_layer::SpriteLayer {
     //     // fn pixel_perfect_render_state() -> RenderState {
@@ -576,6 +624,7 @@ impl Scene {
 
         let transform = model.transform.matrix();
         let aabb = model.world_aabb;
+        let m = &model;
         let model = &model.model;
         if clipping_planes.iter().any(|p| !p.clip(aabb)) {
             return;
@@ -599,6 +648,7 @@ impl Scene {
                     shadowmap[3],
                 ];
                 ctx.apply_pipeline(&bindings.pipeline);
+                assert_eq!(bindings.vertex_buffers.len(), 4);
                 ctx.apply_bindings_from_slice(
                     &bindings.vertex_buffers,
                     bindings.index_buffer,
@@ -606,19 +656,18 @@ impl Scene {
                 );
 
                 let (proj, view) = camera.proj_view();
-                //depth_view_proj = proj * view;
 
                 let projection = proj * view;
                 let time = (miniquad::date::now()) as f32;
                 let time = glam::vec4(time, time.sin(), time.cos(), 0.);
 
-                let model = transform * node.transform.matrix();
-                let model_inverse = model.inverse();
+                let model_matrix = transform * node.transform.matrix();
+                let model_matrix_inverse = model_matrix.inverse();
                 ctx.apply_uniforms(UniformsSource::table(&shader::Uniforms {
                     projection,
                     shadow_projection: shadow_proj,
-                    model,
-                    model_inverse,
+                    model: model_matrix,
+                    model_inverse: model_matrix_inverse,
                     color: bindings.color,
                     shadow_cascades,
                     shadow_casters,
@@ -627,7 +676,8 @@ impl Scene {
                 }));
 
                 let buffer_size = ctx.buffer_size(bindings.index_buffer) as i32 / 2;
-                ctx.draw(0, buffer_size, 1);
+                let multi_size = ctx.buffer_size(bindings.vertex_buffers[3]) as i32 / 12;
+                ctx.draw(0, buffer_size, multi_size);
             }
         }
 
@@ -654,10 +704,10 @@ impl Scene {
                 cubemap.draw(&mut **self.quad_ctx.lock().unwrap(), &proj, &view);
             }
 
-            if let crate::camera::Environment::Solid(color) = camera.environment {
+            if let crate::camera::Environment::SolidColor(color) = camera.environment {
                 clear_action = PassAction::clear_color(color.r, color.g, color.b, color.a);
             }
-            
+
             unsafe {
                 miniquad::gl::glFlush();
                 miniquad::gl::glFinish();

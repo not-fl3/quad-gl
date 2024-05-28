@@ -5,7 +5,7 @@ use glam::{vec2, vec3, Mat4, Vec2, Vec3};
 
 #[derive(Clone, Debug)]
 pub enum Environment {
-    Solid(Color),
+    SolidColor(Color),
     Skybox(Cubemap),
 }
 
@@ -145,7 +145,7 @@ impl Default for Camera {
             position: Vec3::X * -2.0,
             up: Vec3::Y,
             target: Vec3::ZERO,
-            environment: Environment::Solid(Color::new(0.2, 0.2, 0.5, 1.0)),
+            environment: Environment::SolidColor(Color::new(0.2, 0.2, 0.5, 1.0)),
             viewport: None,
             z_far: 100.,
             z_near: 3.0,

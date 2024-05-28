@@ -35,7 +35,7 @@ float ShadowCascade(int ix) {
     if (ix == 3) return ShadowCascades.a;
 }
 
-#if HAS_NORMAL_MAP
+#ifdef HAS_NORMAL_MAP
 vec3 extractNormal(vec2 uv, vec3 pos, vec3 normal, vec3 rgb) {
     vec2 uv_dx = dFdx(uv);
     vec2 uv_dy = dFdy(uv);
@@ -61,7 +61,7 @@ vec3 extractNormal(vec2 uv, vec3 pos, vec3 normal, vec3 rgb) {
 void main() {
     vec3 I = normalize(out_pos - CameraPosition);
 
-#if HAS_NORMAL_MAP
+#ifdef HAS_NORMAL_MAP
     vec3 N = extractNormal(out_uv, out_pos, out_normal, texture2D(Normal, out_uv).rgb);
     vec3 R = reflect(I, N);
 #else
@@ -69,13 +69,13 @@ void main() {
     vec3 R = reflect(I, N);
 #endif
 
-#if HAS_METALLIC_ROUGHNESS_MAP
+#ifdef HAS_METALLIC_ROUGHNESS_MAP
     float roughness = texture2D(MetallicRoughness, out_uv).g * Material.y;
 #else
     float roughness = Material.y;
 #endif
 
-#if HAS_METALLIC_ROUGHNESS_MAP
+#ifdef HAS_METALLIC_ROUGHNESS_MAP
     float metallic = texture2D(MetallicRoughness, out_uv).b * Material.x;
 #else
     float metallic = Material.x;
@@ -108,7 +108,7 @@ void main() {
                     + ShadowMap(i, out_shadow[i].xy, vec2(-1, 0.0), out_shadow[i].z)
                     + ShadowMap(i, out_shadow[i].xy, vec2(-1, -1), out_shadow[i].z)
                     + ShadowMap(i, out_shadow[i].xy, vec2(0.0, -1), out_shadow[i].z);
-                s /= 8;
+                s /= 8.0;
                 visibility = 1.0 - 0.5 * s;
                 break;
             }

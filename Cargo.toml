@@ -33,6 +33,7 @@ zune-core = "*"
 
 [dev-dependencies]
 dolly = "*"
+quad-rand = "*"
 
 [patch.crates-io]
 #quad-snd = {path = '../quad-snd'}

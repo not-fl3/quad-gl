@@ -300,6 +300,7 @@ impl ShadowMap {
                             mvp: depth_view_proj.0 * model,
                         }));
                         let len = ctx.buffer_size(bindings.index_buffer) / 2;
+                        // TODO: dont skip multi_position
                         ctx.draw(0, len as _, 1);
                     }
                 }

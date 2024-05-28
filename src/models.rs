@@ -3,6 +3,7 @@
 use crate::{
     math::{vec2, vec3, Vec2, Vec3},
     scene::{self, Model, Node, NodeData, Scene, Transform},
+    texture::Texture2D,
 };
 use miniquad::*;
 
@@ -131,8 +132,12 @@ pub fn square() -> CpuMesh {
     CpuMesh(vertices, uvs, normals, indices)
 }
 
-impl Scene {
-    pub fn mesh(&mut self, CpuMesh(vertices, uvs, normals, indices): CpuMesh) -> Model {
+impl crate::Context3 {
+    pub fn mesh(
+        &self,
+        CpuMesh(vertices, uvs, normals, indices): CpuMesh,
+        texture: Texture2D,
+    ) -> Model {
         let mut quad_ctx = self.quad_ctx.lock().unwrap();
 
         let vertex_buffer = quad_ctx.new_buffer(
@@ -167,7 +172,7 @@ impl Scene {
         .unwrap();
         let shader = shadermagic::choose_appropriate_shader(&shader, &quad_ctx.info());
         if let miniquad::ShaderSource::Glsl { fragment, vertex } = shader {
-            //println!("{}", vertex);
+            //miniquad::warn!("{}", fragment);
         };
         let shader = quad_ctx
             .new_shader(shader, scene::shader::meta())
@@ -178,27 +183,43 @@ impl Scene {
                 BufferLayout::default(),
                 BufferLayout::default(),
                 BufferLayout::default(),
+                BufferLayout {
+                    step_func: VertexStep::PerInstance,
+                    ..Default::default()
+                },
             ],
             &[
                 VertexAttribute::with_buffer("in_position", VertexFormat::Float3, 0),
                 VertexAttribute::with_buffer("in_uv", VertexFormat::Float2, 1),
                 VertexAttribute::with_buffer("in_normal", VertexFormat::Float3, 2),
+                VertexAttribute::with_buffer("in_inst", VertexFormat::Float3, 3),
             ],
             shader,
             PipelineParams {
                 depth_test: Comparison::LessOrEqual,
-                depth_write: true,
+                depth_write: false,
+                color_blend: Some(BlendState::new(
+                    Equation::Add,
+                    BlendFactor::Value(BlendValue::SourceAlpha),
+                    BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
+                )),
                 ..Default::default()
             },
         );
 
+        let instancing = vec![vec3(0.0, 0.0, 0.0)];
+        let instancing_buffer =
+            quad_ctx.new_buffer(BufferType::VertexBuffer, BufferUsage::Immutable, unsafe {
+                BufferSource::slice(&instancing[..])
+            });
+
         let data = NodeData {
-            vertex_buffers: vec![vertex_buffer, uvs_buffer, normals_buffer],
+            vertex_buffers: vec![vertex_buffer, uvs_buffer, normals_buffer, instancing_buffer],
             index_buffer,
 
             pipeline,
             color: [1.0, 1.0, 1.0, 1.0],
-            base_color_texture: None,
+            base_color_texture: Some(texture.raw_miniquad_id()),
             emissive_texture: None,
             normal_texture: None,
             occlusion_texture: None,

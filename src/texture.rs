@@ -498,14 +498,6 @@ impl Texture2D {
     }
 }
 impl crate::Context3 {
-    /// Loads a [Texture2D] from a file into GPU memory.
-    pub async fn load_texture(&self, path: &str) -> Result<Texture2D, Error> {
-        // let bytes = load_file(path).await?;
-
-        // Ok(self.from_file_with_format(&bytes[..]))
-        unimplemented!()
-    }
-
     /// Creates a Texture2D from a slice of bytes that contains an encoded image.
     ///
     /// If `format` is None, it will make an educated guess on the
@@ -516,13 +508,10 @@ impl crate::Context3 {
     /// # use macroquad::prelude::*;
     /// # #[macroquad::main("test")]
     /// # async fn main() {
-    /// let texture = Texture2D::from_file_with_format(
-    ///     include_bytes!("../examples/rust.png"),
-    ///     None,
-    ///     );
+    /// # let texture = Texture2D::from_file(include_bytes!("../examples/rust.png"));
     /// # }
     /// ```
-    pub fn from_file_with_format(&self, bytes: &[u8]) -> Texture2D {
+    pub fn load_texture(&self, bytes: &[u8]) -> Texture2D {
         let img = image::decode(bytes).unwrap_or_else(|_| panic!());
 
         self.from_rgba8(img.width as _, img.height as _, &img.data)
