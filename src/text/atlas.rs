@@ -91,7 +91,11 @@ impl Atlas {
             if texture_width != self.image.width as u32
                 || texture_height != self.image.height as u32
             {
-                ctx.delete_texture(self.texture);
+                // texture() should return Texture2D::managed, not miniquad::TextureId
+                // or at least postpone the deletion for the next frame:
+                // There is a chance that there is a draw call scheduled by SpriteBatcher
+                // that still use this texture.
+                //ctx.delete_texture(self.texture);
                 self.texture = ctx.new_texture_from_rgba8(
                     self.image.width,
                     self.image.height,
@@ -139,7 +143,7 @@ impl Atlas {
         let y = self.cursor_y;
 
         // texture bounds exceeded
-        if self.cursor_y > self.image.height || self.cursor_x > self.image.width {
+        if y + sprite.height > self.image.height || x + sprite.width > self.image.width {
             // reset glyph cache state
             let sprites = self.sprites.drain().collect::<Vec<_>>();
             self.cursor_x = 0;
