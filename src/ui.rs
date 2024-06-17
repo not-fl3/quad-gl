@@ -626,7 +626,7 @@ impl InputHandler for Ui {
     }
 }
 
-impl crate::Context3 {
+impl crate::QuadGl {
     pub fn new_ui(&self) -> Ui {
         let (w, h) = miniquad::window::screen_size();
         Ui::new(self.quad_ctx.clone(), w, h)
@@ -1240,7 +1240,7 @@ impl Ui {
     // }
 
     pub fn draw(&mut self, canvas: &mut crate::sprite_batcher::SpriteBatcher) {
-        let quad_gl = &mut canvas.quad_gl;
+        let batcher = &mut canvas.batcher;
 
         let mut draw_list = self.ui_draw_list.take().unwrap();
 
@@ -1252,25 +1252,25 @@ impl Ui {
 
         let mut atlas = self.atlas.lock().unwrap();
         let font_texture = atlas.texture(self.quad_ctx.lock().unwrap().as_mut());
-        quad_gl.texture(Some(font_texture));
+        batcher.texture(Some(font_texture));
 
         for draw_command in &ui_draw_list {
             if let Some(ref texture) = draw_command.texture {
-                //quad_gl.texture(Some(texture));
+                //batcher.texture(Some(texture));
                 unimplemented!();
             } else {
-                quad_gl.texture(Some(font_texture));
+                batcher.texture(Some(font_texture));
             }
 
-            quad_gl.scissor(
+            batcher.scissor(
                 draw_command
                     .clipping_zone
                     .map(|rect| (rect.x as i32, rect.y as i32, rect.w as i32, rect.h as i32)),
             );
-            quad_gl.draw_mode(crate::quad_gl::DrawMode::Triangles);
-            quad_gl.geometry(&draw_command.vertices, &draw_command.indices);
+            batcher.draw_mode(crate::draw_calls_batcher::DrawMode::Triangles);
+            batcher.geometry(&draw_command.vertices, &draw_command.indices);
         }
-        quad_gl.texture(None);
+        batcher.texture(None);
 
         std::mem::swap(&mut ui_draw_list, &mut draw_list);
 

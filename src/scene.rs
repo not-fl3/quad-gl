@@ -5,7 +5,7 @@ use crate::{
     image,
     material::Material,
     math::{vec2, vec3, Mat4, Quat, Vec2, Vec3},
-    telemetry, text, Context3,
+    telemetry, text, QuadGl,
 };
 
 use miniquad::*;
@@ -89,7 +89,7 @@ async fn load_file(path: &str) -> Result<Vec<u8>, Error> {
     unimplemented!()
 }
 
-impl crate::Context3 {
+impl crate::QuadGl {
     pub fn load_gltf(&self, gltf: &str) -> Result<Model, Error> {
         use nanogltf::{utils, Gltf};
         use std::borrow::Cow;

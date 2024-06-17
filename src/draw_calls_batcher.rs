@@ -485,7 +485,7 @@ impl PipelinesStorage {
     // }
 }
 
-pub struct QuadGl {
+pub struct DrawCallsBatcher {
     pipelines: PipelinesStorage,
 
     draw_calls: Vec<DrawCall>,
@@ -499,12 +499,12 @@ pub struct QuadGl {
     max_indices: usize,
 }
 
-impl QuadGl {
-    pub fn new(ctx: &mut dyn miniquad::RenderingBackend) -> QuadGl {
+impl DrawCallsBatcher {
+    pub fn new(ctx: &mut dyn miniquad::RenderingBackend) -> DrawCallsBatcher {
         let white_texture = ctx.new_texture_from_rgba8(1, 1, &[255, 255, 255, 255]);
         //let red_texture = ctx.new_texture_from_rgba8(1, 1, &[230, 50, 50, 255]);
 
-        QuadGl {
+        DrawCallsBatcher {
             pipelines: PipelinesStorage::new(ctx),
             state: GlState {
                 clip: None,

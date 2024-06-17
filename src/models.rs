@@ -132,7 +132,7 @@ pub fn square() -> CpuMesh {
     CpuMesh(vertices, uvs, normals, indices)
 }
 
-impl crate::Context3 {
+impl crate::QuadGl {
     pub fn mesh(
         &self,
         CpuMesh(vertices, uvs, normals, indices): CpuMesh,

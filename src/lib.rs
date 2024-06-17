@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::pin::Pin;
 
-mod quad_gl;
+mod draw_calls_batcher;
 
 pub mod camera;
 pub mod color;
@@ -35,7 +35,7 @@ pub(crate) mod image;
 
 use crate::{
     color::{colors::*, Color},
-    quad_gl::QuadGl,
+    draw_calls_batcher::DrawCallsBatcher,
     texture::TextureHandle,
 };
 
@@ -59,17 +59,17 @@ use std::sync::{Arc, Mutex, Weak};
 // }
 
 #[derive(Clone)]
-pub struct Context3 {
+pub struct QuadGl {
     pub quad_ctx: Arc<Mutex<Box<miniquad::Context>>>,
     textures: Arc<Mutex<crate::texture::TexturesContext>>,
     fonts_storage: Arc<Mutex<text::FontsStorage>>,
 }
 
-impl Context3 {
-    pub fn new(quad_ctx: Arc<Mutex<Box<miniquad::Context>>>) -> Context3 {
+impl QuadGl {
+    pub fn new(quad_ctx: Arc<Mutex<Box<miniquad::Context>>>) -> QuadGl {
         let fonts_storage = text::FontsStorage::new(quad_ctx.lock().unwrap().as_mut());
         let textures = crate::texture::TexturesContext::new();
-        Context3 {
+        QuadGl {
             quad_ctx,
             fonts_storage: Arc::new(Mutex::new(fonts_storage)),
             textures: Arc::new(Mutex::new(textures)),

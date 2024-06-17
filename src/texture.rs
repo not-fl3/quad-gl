@@ -2,10 +2,10 @@
 
 use crate::{color::Color, image, math::Rect, text::atlas::SpriteKey, Error};
 
-use crate::quad_gl::{DrawMode, Vertex};
+use crate::draw_calls_batcher::{DrawMode, Vertex};
 use glam::{vec2, Vec2};
 
-pub use crate::quad_gl::FilterMode;
+pub use miniquad::FilterMode;
 
 use slotmap::SlotMap;
 use std::sync::{Arc, Mutex};
@@ -497,7 +497,7 @@ impl Texture2D {
         unimplemented!()
     }
 }
-impl crate::Context3 {
+impl crate::QuadGl {
     /// Creates a Texture2D from a slice of bytes that contains an encoded image.
     ///
     /// If `format` is None, it will make an educated guess on the

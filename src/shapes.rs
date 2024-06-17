@@ -4,7 +4,8 @@ use crate::color::Color;
 
 use crate::{
     math::{vec2, Rect, Vec2, Vec3},
-    quad_gl::{DrawMode, Vertex},
+
+    draw_calls_batcher::{DrawMode, Vertex},
     sprite_batcher::{Axis, SpriteBatcher},
 };
 
