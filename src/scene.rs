@@ -5,8 +5,12 @@ use crate::{
     image,
     material::Material,
     math::{vec2, vec3, Mat4, Quat, Vec2, Vec3},
-    telemetry, text, QuadGl,
+    telemetry, text,
+    texture::Texture2D,
+    QuadGl,
 };
+
+use crate::material::shaders::{preprocess_shader, PreprocessorConfig};
 
 use miniquad::*;
 
@@ -18,20 +22,196 @@ pub mod frustum;
 pub struct NodeData {
     pub vertex_buffers: Vec<miniquad::BufferId>,
     pub index_buffer: miniquad::BufferId,
-    pub(crate) pipeline: miniquad::Pipeline,
-    pub(crate) color: [f32; 4],
-    pub(crate) base_color_texture: Option<miniquad::TextureId>,
-    pub(crate) emissive_texture: Option<miniquad::TextureId>,
-    pub(crate) normal_texture: Option<miniquad::TextureId>,
-    pub(crate) occlusion_texture: Option<miniquad::TextureId>,
-    pub(crate) metallic_roughness_texture: Option<miniquad::TextureId>,
-    pub(crate) material: [f32; 4],
 }
 
+#[derive(Clone, Debug)]
+pub struct Uniform {
+    name: String,
+    uniform_type: UniformType,
+    byte_offset: usize,
+}
+
+#[derive(Clone)]
+pub struct Shader {
+    pub shader: miniquad::ShaderId,
+    pub pipeline: miniquad::Pipeline,
+    pub uniforms: Vec<Uniform>,
+    pub uniforms_data: Vec<u8>,
+}
+
+impl Shader {
+    pub fn new(
+        ctx: &mut miniquad::Context,
+        mut uniforms: Vec<(String, UniformType, usize)>,
+        fragment: Option<&str>,
+        vertex: Option<&str>,
+    ) -> Shader {
+        let mut max_offset = 0;
+
+        let mut meta = shader::meta().clone();
+        for uniform in &uniforms {
+            meta.uniforms
+                .uniforms
+                .push(miniquad::UniformDesc::new(&uniform.0, uniform.1));
+        }
+        let mut max_offset = 0;
+        for miniquad::UniformDesc {
+            name,
+            uniform_type,
+            array_count,
+        } in shader::meta().uniforms.uniforms.into_iter().rev()
+        {
+            uniforms.insert(0, (name.to_owned(), uniform_type, array_count));
+        }
+
+        let uniforms = uniforms
+            .iter()
+            .scan(0, |offset, uniform| {
+                let uniform_byte_size = uniform.1.size() * uniform.2;
+                let uniform = Uniform {
+                    name: uniform.0.clone(),
+                    uniform_type: uniform.1,
+                    byte_offset: *offset,
+                };
+                *offset += uniform_byte_size;
+                max_offset = *offset;
+
+                Some(uniform)
+            })
+            .collect();
+
+        let vertex = preprocess_shader(
+            &vertex.unwrap_or(shader::VERTEX),
+            &PreprocessorConfig {
+                includes: vec![(
+                    "common_vertex.glsl".to_string(),
+                    include_str!("common_vertex.glsl").to_string(),
+                )],
+            },
+        );
+        let shader = shadermagic::transform(
+            fragment.unwrap_or(shader::FRAGMENT),
+            &vertex,
+            &meta,
+            &shadermagic::Options {
+                //defines,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let shader = shadermagic::choose_appropriate_shader(&shader, &ctx.info());
+        if let miniquad::ShaderSource::Glsl { fragment, vertex } = shader {
+            //miniquad::warn!("{}", vertex);
+        };
+        let shader = ctx
+            .new_shader(shader, meta)
+            .unwrap_or_else(|e| panic!("Failed to load shader: {}", e));
+
+        let pipeline = ctx.new_pipeline(
+            &[
+                BufferLayout::default(),
+                BufferLayout::default(),
+                BufferLayout::default(),
+                BufferLayout {
+                    step_func: VertexStep::PerInstance,
+                    ..Default::default()
+                },
+            ],
+            &[
+                VertexAttribute::with_buffer("in_position", VertexFormat::Float3, 0),
+                VertexAttribute::with_buffer("in_uv", VertexFormat::Float2, 1),
+                VertexAttribute::with_buffer("in_normal", VertexFormat::Float3, 2),
+                VertexAttribute::with_buffer("in_inst", VertexFormat::Float3, 3),
+            ],
+            shader,
+            PipelineParams {
+                depth_test: Comparison::LessOrEqual,
+                depth_write: true,
+                color_blend: Some(BlendState::new(
+                    Equation::Add,
+                    BlendFactor::Value(BlendValue::SourceAlpha),
+                    BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
+                )),
+
+                ..Default::default()
+            },
+        );
+
+        Shader {
+            shader,
+            pipeline,
+            uniforms,
+            uniforms_data: vec![0; max_offset],
+        }
+    }
+
+    pub fn default(ctx: &mut miniquad::Context) -> Shader {
+        Self::new(ctx, vec![], None, None)
+    }
+
+    /// Set GPU uniform value for this material.
+    /// "name" should be from "uniforms" list used for material creation.
+    /// Otherwise uniform value would be silently ignored.
+    pub fn set_uniform<T>(&mut self, name: &str, uniform: T) {
+        let uniform_meta = self.uniforms.iter().find(
+            |Uniform {
+                 name: uniform_name, ..
+             }| uniform_name == name,
+        );
+        if uniform_meta.is_none() {
+            eprintln!("Trying to set non-existing uniform: {}", name);
+            return;
+        }
+        let uniform_meta = uniform_meta.unwrap();
+        let uniform_format = uniform_meta.uniform_type;
+        let uniform_byte_size = uniform_format.size();
+        let uniform_byte_offset = uniform_meta.byte_offset;
+
+        if std::mem::size_of::<T>() != uniform_byte_size {
+            eprintln!(
+                "Trying to set uniform {} sized {} bytes value of {} bytes",
+                name,
+                std::mem::size_of::<T>(),
+                uniform_byte_size
+            );
+            return;
+        }
+        macro_rules! transmute_uniform {
+            ($uniform_size:expr, $byte_offset:expr, $n:expr) => {
+                if $uniform_size == $n {
+                    let data: [u8; $n] = unsafe { std::mem::transmute_copy(&uniform) };
+
+                    for i in 0..$uniform_size {
+                        self.uniforms_data[$byte_offset + i] = data[i];
+                    }
+                }
+            };
+        }
+        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 4);
+        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 8);
+        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 12);
+        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 16);
+        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 64);
+    }
+}
+
+#[derive(Clone)]
+pub struct Material2 {
+    pub color: [f32; 4],
+    pub base_color_texture: Option<Texture2D>,
+    pub emissive_texture: Option<Texture2D>,
+    pub normal_texture: Option<Texture2D>,
+    pub occlusion_texture: Option<Texture2D>,
+    pub metallic_roughness_texture: Option<Texture2D>,
+    pub metallic: f32,
+    pub roughness: f32,
+    pub shader: Shader,
+}
 #[derive(Clone)]
 pub struct Node {
     pub name: String,
     pub data: Vec<NodeData>,
+    pub materials: Vec<Material2>,
     pub transform: Transform,
 }
 
@@ -89,279 +269,6 @@ async fn load_file(path: &str) -> Result<Vec<u8>, Error> {
     unimplemented!()
 }
 
-impl crate::QuadGl {
-    pub fn load_gltf(&self, gltf: &str) -> Result<Model, Error> {
-        use nanogltf::{utils, Gltf};
-        use std::borrow::Cow;
-
-        let mut ctx = self.quad_ctx.lock().unwrap();
-
-        let gltf = Gltf::from_json(&gltf).unwrap();
-        //println!("{:#?}", &gltf);
-        let mut buffers = vec![];
-        for buffer in &gltf.buffers {
-            let bytes = match utils::parse_uri(&buffer.uri) {
-                utils::UriData::Bytes(bytes) => bytes,
-                utils::UriData::RelativePath(uri) => {
-                    // examples/assets/a.gltf -> examples/assets
-                    // use std::path::Path;
-                    // let path = Path::new(&path);
-                    // let parent = path.parent().map_or("", |parent| parent.to_str().unwrap());
-                    // load_file(&format!("{}/{}", parent, uri)).await?
-                    unimplemented!()
-                }
-            };
-            buffers.push(bytes);
-        }
-
-        assert!(gltf.scenes.len() == 1);
-
-        let mut textures = vec![];
-        for image in &gltf.images {
-            let source = utils::image_source(&gltf, image);
-            let bytes = match source {
-                utils::ImageSource::Bytes(ref bytes) => Cow::from(bytes),
-                utils::ImageSource::RelativePath(ref uri) => {
-                    use std::path::Path;
-                    // let path = Path::new(&path);
-                    // let parent = path.parent().map_or("", |parent| parent.to_str().unwrap());
-                    // Cow::from(load_file(&format!("{}/{}", parent, uri)).await?)
-                    unimplemented!()
-                }
-                utils::ImageSource::Slice {
-                    buffer,
-                    offset,
-                    length,
-                } => Cow::from(&buffers[0][offset..offset + length]),
-            };
-            let image = image::decode(&bytes).unwrap();
-            let texture =
-                ctx.new_texture_from_rgba8(image.width as u16, image.height as u16, &image.data);
-            ctx.texture_set_wrap(texture, TextureWrap::Repeat, TextureWrap::Repeat);
-            textures.push(texture);
-        }
-
-        let mut nodes = vec![];
-        let scene = &gltf.scenes[0];
-        let mut aabb = AABB {
-            min: vec3(std::f32::MAX, std::f32::MAX, std::f32::MAX),
-            max: vec3(-std::f32::MAX, -std::f32::MAX, -std::f32::MAX),
-        };
-        for node in &scene.nodes {
-            let node = &gltf.nodes[*node];
-            if node.children.len() != 0 {
-                continue;
-            }
-            let translation = node
-                .translation
-                .map_or(Vec3::ZERO, |t| vec3(t[0] as f32, t[1] as f32, t[2] as f32));
-            let rotation = node.rotation.map_or(Quat::IDENTITY, |t| {
-                Quat::from_xyzw(t[0] as f32, t[1] as f32, t[2] as f32, t[3] as f32)
-            });
-            let scale = node.scale.map_or(vec3(1.0, 1.0, 1.0), |t| {
-                vec3(t[0] as f32, t[1] as f32, t[2] as f32)
-            });
-            let transform = Transform {
-                translation,
-                rotation,
-                scale,
-            };
-            let mesh = node.mesh.unwrap();
-            let mesh = &gltf.meshes[mesh];
-            let mut bindings = Vec::new();
-
-            for primitive in &mesh.primitives {
-                let material = &gltf.materials[primitive.material.unwrap()];
-                let color = material.pbr_metallic_roughness.base_color_factor;
-
-                let base_color_texture = &material.pbr_metallic_roughness.base_color_texture;
-                let base_color_texture = base_color_texture.as_ref().map(|t| textures[t.index]);
-                let metallic_roughness_texture = material
-                    .pbr_metallic_roughness
-                    .metallic_roughness_texture
-                    .as_ref()
-                    .map(|t| textures[t.index]);
-                let emissive_texture = material
-                    .emissive_texture
-                    .as_ref()
-                    .map(|t| textures[t.index]);
-                let occlusion_texture = material
-                    .occlusion_texture
-                    .as_ref()
-                    .map(|t| textures[t.index]);
-                let normal_texture = material.normal_texture.as_ref().map(|t| textures[t.index]);
-                let color = [
-                    color[0] as f32,
-                    color[1] as f32,
-                    color[2] as f32,
-                    color[3] as f32,
-                ];
-                let indices = utils::attribute_bytes(&gltf, primitive.indices.unwrap());
-                let indices = &buffers[indices.0][indices.1..indices.1 + indices.2];
-
-                {
-                    let accessor = &gltf.accessors[primitive.attributes["POSITION"]];
-                    let matrix = transform.matrix();
-
-                    let min = accessor.min.as_ref().unwrap();
-                    let min = vec3(min[0] as f32, min[1] as f32, min[2] as f32);
-                    let min = matrix.transform_point3(min);
-                    aabb.min = aabb.min.min(min);
-                    let max = accessor.max.as_ref().unwrap();
-                    let max = vec3(max[0] as f32, max[1] as f32, max[2] as f32);
-                    let max = matrix.transform_point3(max);
-                    aabb.max = aabb.max.max(max);
-                }
-
-                let vertices = utils::attribute_bytes(&gltf, primitive.attributes["POSITION"]);
-                let vertices: &[u8] = &buffers[vertices.0][vertices.1..vertices.1 + vertices.2];
-                let uvs = utils::attribute_bytes(&gltf, primitive.attributes["TEXCOORD_0"]);
-                let uvs = &buffers[uvs.0][uvs.1..uvs.1 + uvs.2];
-                let normals = utils::attribute_bytes(&gltf, primitive.attributes["NORMAL"]);
-                let normals = &buffers[normals.0][normals.1..normals.1 + normals.2];
-                let vertex_buffer =
-                    ctx.new_buffer(BufferType::VertexBuffer, BufferUsage::Immutable, unsafe {
-                        BufferSource::pointer(vertices.as_ptr(), vertices.len(), 4 * 3)
-                    });
-                let normals_buffer =
-                    ctx.new_buffer(BufferType::VertexBuffer, BufferUsage::Immutable, unsafe {
-                        BufferSource::pointer(normals.as_ptr(), normals.len(), 4 * 3)
-                    });
-                let uvs_buffer =
-                    ctx.new_buffer(BufferType::VertexBuffer, BufferUsage::Immutable, unsafe {
-                        BufferSource::pointer(uvs.as_ptr(), uvs.len(), 4 * 2)
-                    });
-                let index_buffer =
-                    ctx.new_buffer(BufferType::IndexBuffer, BufferUsage::Immutable, unsafe {
-                        BufferSource::pointer(indices.as_ptr(), indices.len(), 2)
-                    });
-                let instancing = vec![vec3(0.0, 0.0, 0.0)];
-                let instancing_buffer =
-                    ctx.new_buffer(BufferType::VertexBuffer, BufferUsage::Immutable, unsafe {
-                        BufferSource::slice(&instancing[..])
-                    });
-                let mut defines = vec![];
-                if normal_texture.is_some() {
-                    defines.push("HAS_NORMAL_MAP".to_string());
-                }
-                if metallic_roughness_texture.is_some() {
-                    defines.push("HAS_METALLIC_ROUGHNESS_MAP".to_string());
-                }
-
-                let shader = shadermagic::transform(
-                    shader::FRAGMENT,
-                    shader::VERTEX,
-                    &shader::meta(),
-                    &shadermagic::Options {
-                        defines,
-                        ..Default::default()
-                    },
-                )
-                .unwrap();
-                let shader = shadermagic::choose_appropriate_shader(&shader, &ctx.info());
-                if let miniquad::ShaderSource::Glsl { fragment, vertex } = shader {
-                    //miniquad::warn!("{}", vertex);
-                };
-                let shader = ctx
-                    .new_shader(shader, shader::meta())
-                    .unwrap_or_else(|e| panic!("Failed to load shader: {}", e));
-
-                let pipeline = ctx.new_pipeline(
-                    &[
-                        BufferLayout::default(),
-                        BufferLayout::default(),
-                        BufferLayout::default(),
-                        BufferLayout {
-                            step_func: VertexStep::PerInstance,
-                            ..Default::default()
-                        },
-                    ],
-                    &[
-                        VertexAttribute::with_buffer("in_position", VertexFormat::Float3, 0),
-                        VertexAttribute::with_buffer("in_uv", VertexFormat::Float2, 1),
-                        VertexAttribute::with_buffer("in_normal", VertexFormat::Float3, 2),
-                        VertexAttribute::with_buffer("in_inst", VertexFormat::Float3, 3),
-                    ],
-                    shader,
-                    PipelineParams {
-                        depth_test: Comparison::LessOrEqual,
-                        depth_write: true,
-                        color_blend: Some(BlendState::new(
-                            Equation::Add,
-                            BlendFactor::Value(BlendValue::SourceAlpha),
-                            BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
-                        )),
-
-                        ..Default::default()
-                    },
-                );
-
-                bindings.push(NodeData {
-                    pipeline,
-                    color,
-                    vertex_buffers: vec![
-                        vertex_buffer,
-                        uvs_buffer,
-                        normals_buffer,
-                        instancing_buffer,
-                    ],
-                    index_buffer,
-                    base_color_texture,
-                    emissive_texture,
-                    normal_texture,
-                    occlusion_texture,
-                    metallic_roughness_texture,
-                    material: [
-                        material.pbr_metallic_roughness.metallic_factor as f32,
-                        material.pbr_metallic_roughness.roughness_factor as f32,
-                        0.,
-                        0.,
-                    ],
-                });
-            }
-
-            nodes.push(Node {
-                name: node
-                    .name
-                    .clone()
-                    .unwrap_or("unnamed".to_string())
-                    .to_owned(),
-                data: bindings,
-                transform,
-            });
-        }
-        Ok(Model { nodes, aabb })
-    }
-
-    pub fn load_cubemap(
-        &self,
-        texture_px: &[u8],
-        texture_nx: &[u8],
-        texture_py: &[u8],
-        texture_ny: &[u8],
-        texture_pz: &[u8],
-        texture_nz: &[u8],
-    ) -> Result<crate::cubemap::Cubemap, crate::Error> {
-        let cubemap = [
-            &texture_px[..],
-            &texture_nx[..],
-            &texture_py[..],
-            &texture_ny[..],
-            &texture_pz[..],
-            &texture_nz[..],
-        ];
-        let mut quad_ctx = self.quad_ctx.lock().unwrap();
-        let cubemap = crate::cubemap::Cubemap::new(quad_ctx.as_mut(), &cubemap[..]);
-        quad_ctx.texture_set_min_filter(
-            cubemap.texture,
-            FilterMode::Linear,
-            MipmapFilterMode::Linear,
-        );
-        quad_ctx.texture_generate_mipmaps(cubemap.texture);
-        Ok(cubemap)
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct Transform {
     pub translation: Vec3,
@@ -378,7 +285,7 @@ impl Default for Transform {
     }
 }
 impl Transform {
-    pub(crate) fn matrix(&self) -> Mat4 {
+    pub fn matrix(&self) -> Mat4 {
         Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.translation)
     }
 }
@@ -411,11 +318,20 @@ impl Scene {
         self.models[h.0].update_aabb();
     }
 
-    pub fn translation(&mut self, h: &ModelHandle) -> Vec3 {
+    pub fn translation(&self, h: &ModelHandle) -> Vec3 {
         self.models[h.0].transform.translation
     }
-    pub fn rotation(&mut self, h: &ModelHandle) -> Quat {
+    pub fn rotation(&self, h: &ModelHandle) -> Quat {
         self.models[h.0].transform.rotation
+    }
+
+    pub fn materials(&mut self, h: &ModelHandle) -> impl Iterator<Item = &mut Material2> {
+        self.models[h.0]
+            .model
+            .nodes
+            .iter_mut()
+            .map(|n| n.materials.iter_mut())
+            .flatten()
     }
 
     pub fn update_multi_positions(&mut self, h: &ModelHandle, positions: &[Vec3]) {
@@ -447,17 +363,6 @@ impl Scene {
     }
 }
 
-// #[derive(Clone)]
-// pub struct CameraHandle(usize);
-
-// impl Scene {
-//     pub fn camera(&self, h: &CameraHandle) -> &Camera {
-//         &self.cameras[h.0]
-//     }
-//     pub fn camera_mut(&mut self, h: &CameraHandle) -> &mut Camera {
-//         &mut self.cameras[h.0]
-//     }
-// }
 impl Scene {
     pub(crate) fn new(
         ctx: Arc<Mutex<Box<dyn miniquad::RenderingBackend>>>,
@@ -610,7 +515,7 @@ impl Scene {
         ctx: &mut miniquad::Context,
         white_texture: TextureId,
         black_texture: TextureId,
-        model: &Model2,
+        model: &mut Model2,
         camera: &camera::Camera,
         shadow_proj: [Mat4; 4],
         shadow_cascades: [f32; 4],
@@ -625,29 +530,32 @@ impl Scene {
         let transform = model.transform.matrix();
         let aabb = model.world_aabb;
         let m = &model;
-        let model = &model.model;
+        let model = &mut model.model;
         if clipping_planes.iter().any(|p| !p.clip(aabb)) {
             return;
         }
-        for node in &model.nodes {
-            for bindings in &node.data {
+        for node in &mut model.nodes {
+            for (bindings, material) in node.data.iter_mut().zip(node.materials.iter_mut()) {
                 let cubemap = match camera.environment {
                     crate::camera::Environment::Skybox(ref cubemap) => Some(cubemap.texture),
                     _ => None,
                 };
+                let or_white = |t: &Option<Texture2D>| {
+                    t.as_ref().map_or(white_texture, |t| t.raw_miniquad_id())
+                };
                 let images = [
-                    bindings.base_color_texture.unwrap_or(white_texture),
-                    bindings.emissive_texture.unwrap_or(black_texture),
-                    bindings.occlusion_texture.unwrap_or(white_texture),
-                    bindings.normal_texture.unwrap_or(white_texture),
-                    bindings.metallic_roughness_texture.unwrap_or(white_texture),
+                    or_white(&material.base_color_texture),
+                    or_white(&material.emissive_texture),
+                    or_white(&material.occlusion_texture),
+                    or_white(&material.normal_texture),
+                    or_white(&material.metallic_roughness_texture),
                     cubemap.unwrap_or(white_texture),
                     shadowmap[0],
                     shadowmap[1],
                     shadowmap[2],
                     shadowmap[3],
                 ];
-                ctx.apply_pipeline(&bindings.pipeline);
+                ctx.apply_pipeline(&material.shader.pipeline);
                 assert_eq!(bindings.vertex_buffers.len(), 4);
                 ctx.apply_bindings_from_slice(
                     &bindings.vertex_buffers,
@@ -663,18 +571,40 @@ impl Scene {
 
                 let model_matrix = transform * node.transform.matrix();
                 let model_matrix_inverse = model_matrix.inverse();
-                ctx.apply_uniforms(UniformsSource::table(&shader::Uniforms {
-                    projection,
-                    shadow_projection: shadow_proj,
-                    model: model_matrix,
-                    model_inverse: model_matrix_inverse,
-                    color: bindings.color,
-                    shadow_cascades,
-                    shadow_casters,
-                    material: bindings.material,
-                    camera_pos: camera.position,
-                }));
-
+                // ctx.apply_uniforms(UniformsSource::table(&shader::Uniforms {
+                //     projection,
+                //     shadow_projection: shadow_proj,
+                //     model: model_matrix,
+                //     model_inverse: model_matrix_inverse,
+                //     color: material.color,
+                //     shadow_cascades,
+                //     shadow_casters,
+                //     material: [material.metallic, material.roughness, 0.0, 0.0],
+                //     camera_pos: camera.position,
+                // }));
+                material.shader.set_uniform("Projection", projection);
+                // TODO: implement the array thing
+                material.shader.set_uniform("ShadowProjection", shadow_proj);
+                material.shader.set_uniform("Model", model_matrix);
+                material
+                    .shader
+                    .set_uniform("ModelInverse", model_matrix_inverse);
+                material.shader.set_uniform("Color", material.color);
+                material
+                    .shader
+                    .set_uniform("ShadowCascades", shadow_cascades);
+                material.shader.set_uniform("ShadowCasters", shadow_casters);
+                material.shader.set_uniform(
+                    "Material",
+                    [material.metallic, material.roughness, 0.0, 0.0],
+                );
+                material
+                    .shader
+                    .set_uniform("CameraPosition", camera.position);
+                ctx.apply_uniforms_from_bytes(
+                    material.shader.uniforms_data.as_ptr(),
+                    material.shader.uniforms_data.len(),
+                );
                 let buffer_size = ctx.buffer_size(bindings.index_buffer) as i32 / 2;
                 let multi_size = ctx.buffer_size(bindings.vertex_buffers[3]) as i32 / 12;
                 ctx.draw(0, buffer_size, multi_size);
@@ -748,7 +678,7 @@ impl Scene {
 
         {
             let _z = telemetry::ZoneGuard::new("models");
-            for model in &self.models {
+            for model in &mut self.models {
                 Scene::draw_model(
                     ctx.as_mut(),
                     self.white_texture,
@@ -820,16 +750,16 @@ pub mod shader {
         }
     }
 
-    #[repr(C)]
-    pub struct Uniforms {
-        pub projection: glam::Mat4,
-        pub shadow_projection: [glam::Mat4; 4],
-        pub model: glam::Mat4,
-        pub model_inverse: glam::Mat4,
-        pub color: [f32; 4],
-        pub shadow_cascades: [f32; 4],
-        pub shadow_casters: [i32; 4], // count, split, 0, 0
-        pub material: [f32; 4],       // metallic, roughness, 0, 0,
-        pub camera_pos: glam::Vec3,
-    }
+    // #[repr(C)]
+    // pub struct Uniforms {
+    //     pub projection: glam::Mat4,
+    //     pub shadow_projection: [glam::Mat4; 4],
+    //     pub model: glam::Mat4,
+    //     pub model_inverse: glam::Mat4,
+    //     pub color: [f32; 4],
+    //     pub shadow_cascades: [f32; 4],
+    //     pub shadow_casters: [i32; 4], // count, split, 0, 0
+    //     pub material: [f32; 4],       // metallic, roughness, 0, 0,
+    //     pub camera_pos: glam::Vec3,
+    // }
 }

@@ -35,7 +35,6 @@ float ShadowCascade(int ix) {
     if (ix == 3) return ShadowCascades.a;
 }
 
-#ifdef HAS_NORMAL_MAP
 vec3 extractNormal(vec2 uv, vec3 pos, vec3 normal, vec3 rgb) {
     vec2 uv_dx = dFdx(uv);
     vec2 uv_dy = dFdy(uv);
@@ -56,30 +55,15 @@ vec3 extractNormal(vec2 uv, vec3 pos, vec3 normal, vec3 rgb) {
     res = normalize(mat3(t, b, ng) * res);
     return res;
 }
-#endif
 
 void main() {
     vec3 I = normalize(out_pos - CameraPosition);
 
-#ifdef HAS_NORMAL_MAP
     vec3 N = extractNormal(out_uv, out_pos, out_normal, texture2D(Normal, out_uv).rgb);
     vec3 R = reflect(I, N);
-#else
-    vec3 N = normalize(out_normal);
-    vec3 R = reflect(I, N);
-#endif
 
-#ifdef HAS_METALLIC_ROUGHNESS_MAP
     float roughness = texture2D(MetallicRoughness, out_uv).g * Material.y;
-#else
-    float roughness = Material.y;
-#endif
-
-#ifdef HAS_METALLIC_ROUGHNESS_MAP
     float metallic = texture2D(MetallicRoughness, out_uv).b * Material.x;
-#else
-    float metallic = Material.x;
-#endif
 
     vec4 o = texture2D(Occlusion, out_uv);
     vec4 occlusion = vec4(o.r, o.r, o.r, 1.0);

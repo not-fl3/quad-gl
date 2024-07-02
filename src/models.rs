@@ -7,7 +7,7 @@ use crate::{
 };
 use miniquad::*;
 
-pub struct CpuMesh(Vec<Vec3>, Vec<Vec2>, Vec<Vec3>, Vec<u16>);
+pub struct CpuMesh(pub Vec<Vec3>, pub Vec<Vec2>, pub Vec<Vec3>, pub Vec<u16>);
 
 pub fn sphere(radius: f32, rings: u32, slices: u32) -> CpuMesh {
     let scale = vec3(radius, radius, radius);
@@ -136,7 +136,7 @@ impl crate::QuadGl {
     pub fn mesh(
         &self,
         CpuMesh(vertices, uvs, normals, indices): CpuMesh,
-        texture: Texture2D,
+        texture: Option<Texture2D>,
     ) -> Model {
         let mut quad_ctx = self.quad_ctx.lock().unwrap();
 
@@ -197,7 +197,7 @@ impl crate::QuadGl {
             shader,
             PipelineParams {
                 depth_test: Comparison::LessOrEqual,
-                depth_write: false,
+                depth_write: true,
                 color_blend: Some(BlendState::new(
                     Equation::Add,
                     BlendFactor::Value(BlendValue::SourceAlpha),
@@ -217,14 +217,17 @@ impl crate::QuadGl {
             vertex_buffers: vec![vertex_buffer, uvs_buffer, normals_buffer, instancing_buffer],
             index_buffer,
 
-            pipeline,
+        };
+        let material = scene::Material2 {
             color: [1.0, 1.0, 1.0, 1.0],
-            base_color_texture: Some(texture.raw_miniquad_id()),
+            base_color_texture: texture,
             emissive_texture: None,
             normal_texture: None,
             occlusion_texture: None,
             metallic_roughness_texture: None,
-            material: [0.01, 0.8, 0.0, 0.0],
+            metallic: 0.01,
+            roughness: 0.8,
+            shader: scene::Shader::default(quad_ctx.as_mut()),
         };
 
         let mut aabb = crate::scene::AABB {
@@ -239,6 +242,7 @@ impl crate::QuadGl {
             nodes: vec![Node {
                 name: "root".to_string(),
                 data: vec![data],
+                materials: vec![material],
                 transform: Transform::default(),
             }],
             aabb,

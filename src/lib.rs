@@ -22,7 +22,7 @@ pub mod rounded_rect;
 
 pub mod telemetry;
 
-mod cubemap;
+pub mod cubemap;
 mod error;
 pub mod shadowmap;
 
@@ -31,7 +31,7 @@ pub use error::Error;
 pub mod scene;
 pub mod sprite_batcher;
 
-pub(crate) mod image;
+pub mod image;
 
 use crate::{
     color::{colors::*, Color},

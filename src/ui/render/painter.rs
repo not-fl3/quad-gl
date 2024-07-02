@@ -312,8 +312,6 @@ impl Painter {
         font: &mut Font,
         font_size: u16,
     ) -> TextDimensions {
-        // ERIC
-        // I renamed the non-public version of measure_text
         font.measure_text_ex(label, font_size, 1.0, 1.0)
     }
 

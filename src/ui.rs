@@ -23,7 +23,6 @@ mod style;
 pub mod widgets;
 
 pub use clipboard::ClipboardObject;
-pub use input_handler::{InputHandler, KeyCode};
 pub use render::{DrawList, Vertex};
 pub use style::{Skin, Style, StyleBuilder};
 
@@ -86,6 +85,28 @@ impl From<crate::texture::Texture2D> for UiContent<'static> {
     fn from(data: crate::texture::Texture2D) -> UiContent<'static> {
         UiContent::Texture(data)
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum KeyCode {
+    Up,
+    Down,
+    Right,
+    Left,
+    Backspace,
+    Delete,
+    Enter,
+    Tab,
+    Home,
+    End,
+    Control,
+    Escape,
+    A, // select all
+    Z, // undo
+    Y, // redo
+    C, // copy
+    V, // paste
+    X, // cut
 }
 
 pub(crate) struct Window {
@@ -508,131 +529,6 @@ impl<'a> WindowContext<'a> {
     }
 }
 
-impl InputHandler for Ui {
-    fn mouse_down(&mut self, position: (f32, f32)) {
-        let position = Vec2::new(position.0, position.1);
-
-        self.input.is_mouse_down = true;
-        self.input.click_down = true;
-        self.input.mouse_position = position;
-
-        if let Some(ref window) = self.modal {
-            let rect = Rect::new(
-                window.position.x,
-                window.position.y,
-                window.size.x,
-                window.size.y,
-            );
-            if window.was_active && rect.contains(position) {
-                return;
-            }
-        }
-
-        for (n, window) in self.windows_focus_order.iter().enumerate() {
-            let window = &self.windows[window];
-
-            if window.was_active == false {
-                continue;
-            }
-
-            if window.top_level() && window.title_rect().contains(position) && window.movable {
-                self.moving = Some((
-                    window.id,
-                    position - Vec2::new(window.position.x, window.position.y),
-                ));
-            }
-
-            if window.top_level() && window.full_rect().contains(position) {
-                let window = self.windows_focus_order.remove(n);
-                self.windows_focus_order.insert(0, window);
-                return;
-            }
-        }
-    }
-
-    fn mouse_up(&mut self, _: (f32, f32)) {
-        self.input.is_mouse_down = false;
-        self.input.click_up = true;
-        self.moving = None;
-    }
-
-    fn mouse_wheel(&mut self, x: f32, y: f32) {
-        self.input.mouse_wheel = Vec2::new(x, y);
-    }
-
-    fn mouse_move(&mut self, position: (f32, f32)) {
-        let position = Vec2::new(position.0, position.1);
-
-        // assuming that the click was to the root window
-        // if it is not - hovered_window will be set a little later in that function
-        self.hovered_window = 0;
-        for window in self.windows_focus_order.iter() {
-            let window = &self.windows[window];
-
-            if window.top_level() && window.was_active && window.full_rect().contains(position) {
-                self.hovered_window = window.id;
-                break;
-            }
-        }
-
-        match &self.modal {
-            Some(modal) if modal.was_active || modal.active => {
-                if modal.full_rect().contains(position) {
-                    self.hovered_window = modal.id;
-                }
-            }
-            _ => {}
-        }
-
-        self.input.mouse_position = position;
-        if let Some((id, orig)) = self.moving.as_ref() {
-            self.windows
-                .get_mut(id)
-                .unwrap()
-                .set_position(Vec2::new(position.x - orig.x, position.y - orig.y));
-        }
-    }
-
-    fn char_event(&mut self, character: char, shift: bool, ctrl: bool) {
-        self.input.modifier_ctrl = ctrl;
-        self.input.input_buffer.push(input::InputCharacter {
-            key: input::Key::Char(character),
-            modifier_shift: shift,
-            modifier_ctrl: ctrl,
-        });
-    }
-
-    fn key_down(&mut self, key: KeyCode, shift: bool, ctrl: bool) {
-        self.input.modifier_ctrl = ctrl;
-
-        if key == KeyCode::Escape {
-            self.input.escape = true;
-        }
-        if key == KeyCode::Enter {
-            self.input.enter = true;
-        }
-
-        if ctrl && (key == KeyCode::C || key == KeyCode::X) {
-            self.clipboard.set(&self.clipboard_selection);
-        }
-
-        if key != KeyCode::Control && self.key_repeat.add_repeat_gap(key, self.time) {
-            self.input.input_buffer.push(input::InputCharacter {
-                key: input::Key::KeyCode(key),
-                modifier_shift: shift,
-                modifier_ctrl: ctrl,
-            });
-        }
-    }
-}
-
-impl crate::QuadGl {
-    pub fn new_ui(&self) -> Ui {
-        let (w, h) = miniquad::window::screen_size();
-        Ui::new(self.quad_ctx.clone(), w, h)
-    }
-}
-
 impl Ui {
     pub fn new(
         quad_ctx: Arc<Mutex<Box<miniquad::Context>>>,
@@ -704,6 +600,122 @@ impl Ui {
 
             quad_ctx: quad_ctx.clone(),
             ui_draw_list: Some(vec![]),
+        }
+    }
+
+    pub fn mouse_down(&mut self, position: (f32, f32)) {
+        let position = Vec2::new(position.0, position.1);
+
+        self.input.is_mouse_down = true;
+        self.input.click_down = true;
+        self.input.mouse_position = position;
+
+        if let Some(ref window) = self.modal {
+            let rect = Rect::new(
+                window.position.x,
+                window.position.y,
+                window.size.x,
+                window.size.y,
+            );
+            if window.was_active && rect.contains(position) {
+                return;
+            }
+        }
+
+        for (n, window) in self.windows_focus_order.iter().enumerate() {
+            let window = &self.windows[window];
+
+            if window.was_active == false {
+                continue;
+            }
+
+            if window.top_level() && window.title_rect().contains(position) && window.movable {
+                self.moving = Some((
+                    window.id,
+                    position - Vec2::new(window.position.x, window.position.y),
+                ));
+            }
+
+            if window.top_level() && window.full_rect().contains(position) {
+                let window = self.windows_focus_order.remove(n);
+                self.windows_focus_order.insert(0, window);
+                return;
+            }
+        }
+    }
+
+    pub fn mouse_up(&mut self, _: (f32, f32)) {
+        self.input.is_mouse_down = false;
+        self.input.click_up = true;
+        self.moving = None;
+    }
+
+    pub fn mouse_wheel(&mut self, x: f32, y: f32) {
+        self.input.mouse_wheel = Vec2::new(x, y);
+    }
+
+    pub fn mouse_move(&mut self, position: (f32, f32)) {
+        let position = Vec2::new(position.0, position.1);
+
+        // assuming that the click was to the root window
+        // if it is not - hovered_window will be set a little later in that function
+        self.hovered_window = 0;
+        for window in self.windows_focus_order.iter() {
+            let window = &self.windows[window];
+
+            if window.top_level() && window.was_active && window.full_rect().contains(position) {
+                self.hovered_window = window.id;
+                break;
+            }
+        }
+
+        match &self.modal {
+            Some(modal) if modal.was_active || modal.active => {
+                if modal.full_rect().contains(position) {
+                    self.hovered_window = modal.id;
+                }
+            }
+            _ => {}
+        }
+
+        self.input.mouse_position = position;
+        if let Some((id, orig)) = self.moving.as_ref() {
+            self.windows
+                .get_mut(id)
+                .unwrap()
+                .set_position(Vec2::new(position.x - orig.x, position.y - orig.y));
+        }
+    }
+
+    pub fn char_event(&mut self, character: char, shift: bool, ctrl: bool) {
+        self.input.modifier_ctrl = ctrl;
+        self.input.input_buffer.push(input::InputCharacter {
+            key: input::Key::Char(character),
+            modifier_shift: shift,
+            modifier_ctrl: ctrl,
+        });
+    }
+
+    pub fn key_down(&mut self, key: KeyCode, shift: bool, ctrl: bool) {
+        self.input.modifier_ctrl = ctrl;
+
+        if key == KeyCode::Escape {
+            self.input.escape = true;
+        }
+        if key == KeyCode::Enter {
+            self.input.enter = true;
+        }
+
+        if ctrl && (key == KeyCode::C || key == KeyCode::X) {
+            self.clipboard.set(&self.clipboard_selection);
+        }
+
+        if key != KeyCode::Control && self.key_repeat.add_repeat_gap(key, self.time) {
+            self.input.input_buffer.push(input::InputCharacter {
+                key: input::Key::KeyCode(key),
+                modifier_shift: shift,
+                modifier_ctrl: ctrl,
+            });
         }
     }
 
@@ -968,6 +980,9 @@ impl Ui {
     }
 
     pub fn is_mouse_over(&self, mouse_position: Vec2) -> bool {
+        if self.is_mouse_captured() {
+            return true;
+        }
         for window in self.windows_focus_order.iter() {
             let window = &self.windows[window];
             if window.was_active == false {
@@ -1256,8 +1271,7 @@ impl Ui {
 
         for draw_command in &ui_draw_list {
             if let Some(ref texture) = draw_command.texture {
-                //batcher.texture(Some(texture));
-                unimplemented!();
+                batcher.texture(Some(texture.raw_miniquad_id()));
             } else {
                 batcher.texture(Some(font_texture));
             }

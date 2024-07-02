@@ -14,6 +14,8 @@ uniform mat4 ModelInverse;
 uniform mat4 Projection;
 uniform mat4 ShadowProjection[4];
 
+void vertex();
+
 void main() {
     vec3 p = in_position + in_inst;
     gl_Position = Projection * Model * vec4(p, 1);
@@ -24,4 +26,5 @@ void main() {
     for (int i = 0; i < 4; i++) {
         out_shadow[i] = ShadowProjection[i] * Model * vec4(p, 1.0) * vec4(0.5) + vec4(0.5);
     }
+    vertex();
 }

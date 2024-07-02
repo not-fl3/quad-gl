@@ -12,12 +12,12 @@ pub struct Texture {
 }
 
 impl Texture {
-    pub fn new(texture: Texture2D) -> Texture {
+    pub fn new(texture: &Texture2D) -> Texture {
         Texture {
             position: None,
             w: 100.,
             h: 100.,
-            texture,
+            texture: texture.clone(),
         }
     }
 
@@ -53,7 +53,7 @@ impl Texture {
 }
 
 impl Ui {
-    pub fn texture(&mut self, texture: Texture2D, w: f32, h: f32) -> bool {
+    pub fn texture(&mut self, texture: &Texture2D, w: f32, h: f32) -> bool {
         Texture::new(texture).size(w, h).ui(self)
     }
 }

@@ -17,7 +17,7 @@ pub struct SpriteBatcher {
 }
 
 impl SpriteBatcher {
-    pub(crate) fn new(
+    pub fn new(
         quad_ctx: Arc<Mutex<Box<miniquad::Context>>>,
         fonts_storage: Arc<Mutex<text::FontsStorage>>,
     ) -> SpriteBatcher {

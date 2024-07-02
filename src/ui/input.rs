@@ -1,6 +1,6 @@
 use crate::math::Vec2;
 
-pub use crate::ui::input_handler::KeyCode;
+pub use crate::ui::KeyCode;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Key {

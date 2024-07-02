@@ -5,7 +5,7 @@ use quad_gl::{
     math::*,
     scene::Scene,
     sprite_batcher::SpriteBatcher,
-    Context3,
+    QuadGl,
 };
 use std::sync::{Arc, Mutex};
 
@@ -23,7 +23,7 @@ impl Stage {
         let ctx = miniquad::window::new_rendering_backend();
         let ctx = Arc::new(Mutex::new(ctx));
 
-        let graphics = Context3::new(ctx.clone());
+        let graphics = QuadGl::new(ctx.clone());
         let mut scene = graphics.new_scene();
 
         let helmet = graphics
@@ -31,16 +31,17 @@ impl Stage {
             .unwrap();
         let _helmet = scene.add_model(&helmet);
 
-        let skybox = graphics
-            .load_cubemap(
+        let skybox = quad_gl::cubemap::Cubemap::new(
+            ctx.lock().unwrap().as_mut(),
+            &[
                 include_bytes!("skybox/skybox_px.png"),
                 include_bytes!("skybox/skybox_nx.png"),
                 include_bytes!("skybox/skybox_py.png"),
                 include_bytes!("skybox/skybox_ny.png"),
                 include_bytes!("skybox/skybox_pz.png"),
                 include_bytes!("skybox/skybox_nz.png"),
-            )
-            .unwrap();
+            ],
+        );
 
         let camera = Camera {
             environment: Environment::Skybox(skybox),

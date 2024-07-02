@@ -21,3 +21,5 @@ macro_rules! hash {
         $crate::hash!(s)
     }};
 }
+
+pub use hash;

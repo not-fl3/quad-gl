@@ -35,12 +35,25 @@ pub fn decode(bytes: &[u8]) -> Result<RGBA8Buffer, Box<std::error::Error>> {
         let (width, height) = decoder.get_dimensions().unwrap();
 
         let pixels = decoder.decode_raw().unwrap();
-        assert!(pixels.len() == width * height * 4); // and deal with u16 png later
-        Ok(RGBA8Buffer {
-            width: width as _,
-            height: height as _,
-            data: pixels,
-        })
+        if pixels.len() == width * height * 2 {
+            Ok(RGBA8Buffer {
+                width: width as _,
+                height: height as _,
+                data: pixels
+                    .chunks(2)
+                    .map(|v| [v[0], v[0], v[0], v[1]])
+                    .flatten()
+                    .collect::<Vec<_>>(),
+            })
+        } else if pixels.len() == width * height * 4 {
+            Ok(RGBA8Buffer {
+                width: width as _,
+                height: height as _,
+                data: pixels,
+            })
+        } else {
+            unimplemented!()
+        }
     } else {
         panic!()
     }

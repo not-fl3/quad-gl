@@ -7,8 +7,7 @@ use quad_gl::{
     models,
     scene::{ModelHandle, Scene},
     sprite_batcher::SpriteBatcher,
-    texture::Texture2D,
-    Context3,
+    QuadGl,
 };
 use std::sync::{Arc, Mutex};
 
@@ -30,7 +29,7 @@ impl Stage {
         let ctx = miniquad::window::new_rendering_backend();
         let ctx = Arc::new(Mutex::new(ctx));
 
-        let graphics = Context3::new(ctx.clone());
+        let graphics = QuadGl::new(ctx.clone());
         let mut scene = graphics.new_scene();
 
         let texture = graphics.load_texture(include_bytes!("ferris2.png"));

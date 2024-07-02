@@ -133,6 +133,13 @@ impl Cubemap {
             },
         );
 
+        ctx.texture_set_min_filter(
+            color_img,
+            FilterMode::Linear,
+            MipmapFilterMode::Linear,
+        );
+        ctx.texture_generate_mipmaps(color_img);
+
         Cubemap {
             display_pipeline,
             display_bind,
