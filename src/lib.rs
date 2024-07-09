@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::pin::Pin;
 
-mod draw_calls_batcher;
+pub mod draw_calls_batcher;
 
 pub mod camera;
 pub mod color;
@@ -24,6 +24,7 @@ pub mod telemetry;
 
 pub mod cubemap;
 mod error;
+mod tobytes;
 pub mod shadowmap;
 
 pub use error::Error;

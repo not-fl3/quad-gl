@@ -7,6 +7,7 @@ use crate::{
     math::{vec2, vec3, Mat4, Quat, Vec2, Vec3},
     telemetry, text,
     texture::Texture2D,
+    tobytes::ToBytes,
     QuadGl,
 };
 
@@ -29,6 +30,7 @@ pub struct Uniform {
     name: String,
     uniform_type: UniformType,
     byte_offset: usize,
+    byte_size: usize,
 }
 
 #[derive(Clone)]
@@ -67,13 +69,14 @@ impl Shader {
         let uniforms = uniforms
             .iter()
             .scan(0, |offset, uniform| {
-                let uniform_byte_size = uniform.1.size() * uniform.2;
+                let byte_size = uniform.1.size() * uniform.2;
                 let uniform = Uniform {
                     name: uniform.0.clone(),
                     uniform_type: uniform.1,
                     byte_offset: *offset,
+                    byte_size,
                 };
-                *offset += uniform_byte_size;
+                *offset += byte_size;
                 max_offset = *offset;
 
                 Some(uniform)
@@ -152,7 +155,7 @@ impl Shader {
     /// Set GPU uniform value for this material.
     /// "name" should be from "uniforms" list used for material creation.
     /// Otherwise uniform value would be silently ignored.
-    pub fn set_uniform<T>(&mut self, name: &str, uniform: T) {
+    pub fn set_uniform<T: ToBytes>(&mut self, name: &str, uniform: T) {
         let uniform_meta = self.uniforms.iter().find(
             |Uniform {
                  name: uniform_name, ..
@@ -164,10 +167,10 @@ impl Shader {
         }
         let uniform_meta = uniform_meta.unwrap();
         let uniform_format = uniform_meta.uniform_type;
-        let uniform_byte_size = uniform_format.size();
+        let uniform_byte_size = uniform_meta.byte_size;
         let uniform_byte_offset = uniform_meta.byte_offset;
 
-        if std::mem::size_of::<T>() != uniform_byte_size {
+        if uniform_byte_size != uniform_byte_size {
             eprintln!(
                 "Trying to set uniform {} sized {} bytes value of {} bytes",
                 name,
@@ -176,22 +179,10 @@ impl Shader {
             );
             return;
         }
-        macro_rules! transmute_uniform {
-            ($uniform_size:expr, $byte_offset:expr, $n:expr) => {
-                if $uniform_size == $n {
-                    let data: [u8; $n] = unsafe { std::mem::transmute_copy(&uniform) };
-
-                    for i in 0..$uniform_size {
-                        self.uniforms_data[$byte_offset + i] = data[i];
-                    }
-                }
-            };
+        let data: &[u8] = uniform.to_bytes().as_ref();
+        for i in 0..uniform_byte_size {
+            self.uniforms_data[uniform_byte_offset + i] = data[i];
         }
-        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 4);
-        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 8);
-        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 12);
-        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 16);
-        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 64);
     }
 }
 
@@ -543,9 +534,12 @@ impl Scene {
                 let or_white = |t: &Option<Texture2D>| {
                     t.as_ref().map_or(white_texture, |t| t.raw_miniquad_id())
                 };
+                let or_black = |t: &Option<Texture2D>| {
+                    t.as_ref().map_or(black_texture, |t| t.raw_miniquad_id())
+                };
                 let images = [
                     or_white(&material.base_color_texture),
-                    or_white(&material.emissive_texture),
+                    or_black(&material.emissive_texture),
                     or_white(&material.occlusion_texture),
                     or_white(&material.normal_texture),
                     or_white(&material.metallic_roughness_texture),
@@ -584,7 +578,7 @@ impl Scene {
                 // }));
                 material.shader.set_uniform("Projection", projection);
                 // TODO: implement the array thing
-                material.shader.set_uniform("ShadowProjection", shadow_proj);
+                material.shader.set_uniform("ShadowProjection", &shadow_proj[..]);
                 material.shader.set_uniform("Model", model_matrix);
                 material
                     .shader

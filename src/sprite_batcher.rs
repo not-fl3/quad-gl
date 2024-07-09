@@ -33,7 +33,6 @@ impl SpriteBatcher {
     }
 
     pub fn clear(&mut self) {
-        
         self.batcher
             .clear(self.quad_ctx.lock().unwrap().as_mut())
     }
@@ -53,6 +52,7 @@ impl SpriteBatcher {
     pub fn wtf(&mut self, mat: crate::math::Mat4) {
         self.batcher.push_model_matrix(mat);
     }
+
     pub fn draw(&mut self) {
         let mut ctx = self.quad_ctx.lock().unwrap();
 
