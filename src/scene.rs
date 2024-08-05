@@ -92,12 +92,16 @@ impl Shader {
                 )],
             },
         );
+        let defines = vec![
+            "HAS_METALLIC_ROUGHNESS_MAP".to_string(),
+            "HAS_NORMAL_MAP".to_string(),
+        ];
         let shader = shadermagic::transform(
             fragment.unwrap_or(shader::FRAGMENT),
             &vertex,
             &meta,
             &shadermagic::Options {
-                //defines,
+                defines,
                 ..Default::default()
             },
         )
@@ -578,7 +582,9 @@ impl Scene {
                 // }));
                 material.shader.set_uniform("Projection", projection);
                 // TODO: implement the array thing
-                material.shader.set_uniform("ShadowProjection", &shadow_proj[..]);
+                material
+                    .shader
+                    .set_uniform("ShadowProjection", &shadow_proj[..]);
                 material.shader.set_uniform("Model", model_matrix);
                 material
                     .shader
