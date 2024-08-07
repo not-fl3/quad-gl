@@ -8,6 +8,8 @@ use crate::{
     texture::Texture2D,
 };
 
+use std::sync::Arc;
+
 pub struct DrawCanvas<'a> {
     pub(crate) context: WindowContext<'a>,
 }
@@ -40,7 +42,7 @@ impl<'a> DrawCanvas<'a> {
         self.context.window.painter.draw_line(start, end, color);
     }
 
-    pub fn image(&mut self, rect: Rect, texture: &Texture2D) {
+    pub fn image(&mut self, rect: Rect, texture: Arc<Texture2D>) {
         self.context.register_click_intention(rect);
 
         self.context.window.painter.draw_raw_texture(rect, texture);

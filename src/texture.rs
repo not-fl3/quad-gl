@@ -7,54 +7,8 @@ use glam::{vec2, Vec2};
 
 pub use miniquad::FilterMode;
 
-use slotmap::SlotMap;
 use std::sync::{Arc, Mutex};
 
-slotmap::new_key_type! {
-    pub(crate) struct TextureSlotId;
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct TextureSlotGuarded(pub TextureSlotId);
-
-#[derive(Clone)]
-pub(crate) enum TextureHandle {
-    // texture that belongs to macroquad and follows normal garbage collection rules
-    Managed(Arc<TextureSlotGuarded>, Arc<Mutex<TexturesContext>>),
-    ManagedWeak(TextureSlotId),
-    // raw miniquad texture, there are no guarantees that this texture is not yet deleted
-    Unmanaged(miniquad::TextureId),
-}
-
-pub(crate) struct TexturesContext {
-    textures: SlotMap<crate::texture::TextureSlotId, (miniquad::TextureId, u32, u32)>,
-}
-impl TexturesContext {
-    pub fn new() -> TexturesContext {
-        TexturesContext {
-            textures: SlotMap::with_key(),
-        }
-    }
-    fn store_texture(
-        &mut self,
-        texture: (miniquad::TextureId, u32, u32),
-        this: Arc<Mutex<TexturesContext>>,
-    ) -> TextureHandle {
-        TextureHandle::Managed(
-            Arc::new(TextureSlotGuarded(self.textures.insert(texture))),
-            this,
-        )
-    }
-    pub fn texture(&self, texture: TextureSlotId) -> Option<(miniquad::TextureId, u32, u32)> {
-        self.textures.get(texture).copied()
-    }
-    fn remove(&mut self, texture: TextureSlotId) {
-        self.textures.remove(texture);
-    }
-    pub fn len(&self) -> usize {
-        self.textures.len()
-    }
-}
 use crate::sprite_batcher::SpriteBatcher;
 
 /// Image, data stored in CPU memory
@@ -215,7 +169,7 @@ impl Image {
 
 #[derive(Clone, Debug)]
 pub struct RenderTarget {
-    pub texture: Texture2D,
+    pub texture: Arc<Texture2D>,
     pub render_pass: miniquad::RenderPass,
 }
 
@@ -433,70 +387,30 @@ impl SpriteBatcher {
 // }
 
 /// Texture, data stored in GPU memory
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Texture2D {
-    pub(crate) texture: TextureHandle,
-}
-impl std::fmt::Debug for TextureHandle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TextureHandle").finish()
-    }
-}
-impl std::cmp::PartialEq for TextureHandle {
-    fn eq(&self, other: &TextureHandle) -> bool {
-        use TextureHandle::*;
-        match (self, other) {
-            (Managed(ref x, _), Managed(ref y, _)) => x.eq(y),
-            (ManagedWeak(ref x), ManagedWeak(ref y)) => x.eq(y),
-            (Unmanaged(ref x), Unmanaged(ref y)) => x.eq(y),
-            _ => false,
-        }
-    }
-}
-impl Drop for TextureSlotGuarded {
-    fn drop(&mut self) {
-        // let ctx = get_context();
-        // if let Some(texture) = ctx.textures.texture(self.0) {
-        //     ctx.quad_ctx.delete_texture(texture);
-        // }
-        // ctx.textures.remove(self.0);
-    }
+    pub(crate) texture: miniquad::TextureId,
+    pub(crate) width: u16,
+    pub(crate) height: u16,
 }
 
 impl Texture2D {
-    pub fn weak_clone(&self) -> Texture2D {
-        match &self.texture {
-            TextureHandle::Unmanaged(id) => Texture2D::unmanaged(*id),
-            TextureHandle::Managed(t, _) => Texture2D {
-                texture: TextureHandle::ManagedWeak((**t).0),
-            },
-            TextureHandle::ManagedWeak(t) => Texture2D {
-                texture: TextureHandle::ManagedWeak(t.clone()),
-            },
-        }
-    }
-    pub(crate) fn unmanaged(texture: miniquad::TextureId) -> Texture2D {
+    pub fn from_miniquad_id(texture: miniquad::TextureId, width: u16, height: u16) -> Texture2D {
         Texture2D {
-            texture: TextureHandle::Unmanaged(texture),
+            texture,
+            width,
+            height,
         }
     }
-    /// Creates an empty Texture2D.
-    ///
-    /// # Example
-    /// ```
-    /// # use macroquad::prelude::*;
-    /// # #[macroquad::main("test")]
-    /// # async fn main() {
-    /// let texture = Texture2D::empty();
-    /// # }
-    /// ```
-    pub fn empty() -> Texture2D {
-        // let ctx = get_context();
+    pub fn width(&self) -> u16 {
+        self.width
+    }
 
-        // Texture2D::unmanaged(ctx.white_texture)
-        unimplemented!()
+    pub fn height(&self) -> u16 {
+        self.height
     }
 }
+
 impl crate::QuadGl {
     /// Creates a Texture2D from a slice of bytes that contains an encoded image.
     ///
@@ -511,29 +425,33 @@ impl crate::QuadGl {
     /// # let texture = Texture2D::from_file(include_bytes!("../examples/rust.png"));
     /// # }
     /// ```
-    pub fn load_texture(&self, bytes: &[u8]) -> Texture2D {
+    pub fn load_texture(&self, bytes: &[u8]) -> Arc<Texture2D> {
         let img = image::decode(bytes).unwrap_or_else(|_| panic!());
 
         self.from_rgba8(img.width as _, img.height as _, &img.data)
     }
 
-    pub fn render_target(&self, width: u32, height: u32) -> RenderTarget {
+    pub fn render_target(&self, width: u16, height: u16) -> RenderTarget {
         let mut quad_ctx = self.quad_ctx.lock().unwrap();
 
         let texture = quad_ctx.new_render_texture(miniquad::TextureParams {
-            width,
-            height,
+            width: width as _,
+            height: height as _,
             ..Default::default()
         });
         let depth_img = quad_ctx.new_render_texture(miniquad::TextureParams {
-            width,
-            height,
+            width: width as _,
+            height: height as _,
             format: miniquad::TextureFormat::Depth,
             ..Default::default()
         });
 
         let render_pass = quad_ctx.new_render_pass(texture, Some(depth_img));
-        let texture = Texture2D::from_miniquad_texture(texture);
+        let texture = Arc::new(Texture2D {
+            texture,
+            width,
+            height,
+        });
 
         RenderTarget {
             texture,
@@ -542,7 +460,7 @@ impl crate::QuadGl {
     }
 
     /// Creates a Texture2D from an [Image].
-    pub fn from_image(&self, image: &Image) -> Texture2D {
+    pub fn from_image(&self, image: &Image) -> Arc<Texture2D> {
         self.from_rgba8(image.width, image.height, &image.bytes)
     }
 
@@ -560,14 +478,15 @@ impl crate::QuadGl {
     /// let texture = Texture2D::from_rgba8(2, 2, &bytes);
     /// # }
     /// ```
-    pub fn from_rgba8(&self, width: u16, height: u16, bytes: &[u8]) -> Texture2D {
+    pub fn from_rgba8(&self, width: u16, height: u16, bytes: &[u8]) -> Arc<Texture2D> {
         let mut quad_ctx = self.quad_ctx.lock().unwrap();
         let texture = quad_ctx.new_texture_from_rgba8(width, height, bytes);
 
-        let wtf = self.textures.clone();
-        let mut textures = self.textures.lock().unwrap();
-        let texture = textures.store_texture((texture, width as u32, height as u32), wtf);
-        let texture = Texture2D { texture };
+        let texture = Arc::new(Texture2D {
+            texture,
+            width,
+            height,
+        });
 
         //ctx.texture_batcher.add_unbatched(&texture);
 
@@ -642,27 +561,17 @@ impl crate::QuadGl {
 //     }
 
 impl Texture2D {
-    /// Creates a Texture2D from a miniquad
-    /// [Texture](https://docs.rs/miniquad/0.3.0-alpha/miniquad/graphics/struct.Texture.html)
-    pub fn from_miniquad_texture(texture: miniquad::TextureId) -> Texture2D {
-        Texture2D {
-            texture: TextureHandle::Unmanaged(texture),
-        }
-    }
+    // /// Creates a Texture2D from a miniquad
+    // /// [Texture](https://docs.rs/miniquad/0.3.0-alpha/miniquad/graphics/struct.Texture.html)
+    // pub fn from_miniquad_texture(texture: miniquad::TextureId) -> Texture2D {
+    //     Texture2D {
+    //         texture,
+    //     }
+    // }
 
     /// Returns the handle for this texture.
     pub fn raw_miniquad_id(&self) -> miniquad::TextureId {
-        // let ctx = get_context();
-
-        // ctx.raw_miniquad_id(&self.texture)
-        match &self.texture {
-            TextureHandle::Unmanaged(texture) => *texture,
-            TextureHandle::Managed(texture, ctx) => {
-                let ctx = ctx.lock().unwrap();
-                ctx.texture(texture.0).unwrap().0
-            }
-            _ => unimplemented!(),
-        }
+        self.texture
     }
 }
 
@@ -729,9 +638,9 @@ impl Batcher {
         }
     }
 
-    pub fn add_unbatched(&mut self, texture: &Texture2D) {
-        self.unbatched.push(texture.weak_clone());
-    }
+    // pub fn add_unbatched(&mut self, texture: &Texture2D) {
+    //     self.unbatched.push(texture.weak_clone());
+    // }
 
     // pub fn get(&mut self, texture: &Texture2D) -> Option<(Texture2D, Rect)> {
     //     let id = SpriteKey::Texture(texture.raw_miniquad_id());

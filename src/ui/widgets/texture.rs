@@ -4,15 +4,17 @@ use crate::{
     ui::{Layout, Ui},
 };
 
+use std::sync::Arc;
+
 pub struct Texture {
     position: Option<Vec2>,
     w: f32,
     h: f32,
-    texture: Texture2D,
+    texture: Arc<Texture2D>,
 }
 
 impl Texture {
-    pub fn new(texture: &Texture2D) -> Texture {
+    pub fn new(texture: Arc<Texture2D>) -> Texture {
         Texture {
             position: None,
             w: 100.,
@@ -40,10 +42,10 @@ impl Texture {
             .window
             .cursor
             .fit(size, self.position.map_or(Layout::Vertical, Layout::Free));
-        context
-            .window
-            .painter
-            .draw_raw_texture(Rect::new(pos.x, pos.y, self.w, self.h), &self.texture);
+        context.window.painter.draw_raw_texture(
+            Rect::new(pos.x, pos.y, self.w, self.h),
+            self.texture.clone(),
+        );
 
         let rect = Rect::new(pos.x, pos.y, size.x as f32, size.y as f32);
         let hovered = rect.contains(context.input.mouse_position);
@@ -53,7 +55,7 @@ impl Texture {
 }
 
 impl Ui {
-    pub fn texture(&mut self, texture: &Texture2D, w: f32, h: f32) -> bool {
+    pub fn texture(&mut self, texture: Arc<Texture2D>, w: f32, h: f32) -> bool {
         Texture::new(texture).size(w, h).ui(self)
     }
 }

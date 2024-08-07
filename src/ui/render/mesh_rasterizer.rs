@@ -253,11 +253,12 @@ fn get_active_draw_list<'a, 'b>(
                 .map_or(false, |t| t.texture == texture.texture)
             {
                 let clipping_zone = last.clipping_zone;
-                draw_lists.push(DrawList {
-                    texture: Some(texture.clone()),
-                    clipping_zone,
-                    ..DrawList::new()
-                });
+                // draw_lists.push(DrawList {
+                //     texture: Some(texture.clone()),
+                //     clipping_zone,
+                //     ..DrawList::new()
+                // });
+                unimplemented!()
             }
         }
         DrawCommand::DrawCharacter { .. }

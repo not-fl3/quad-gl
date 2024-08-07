@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::{
     color::Color,
     math::{vec3, Rect},
-    texture::{Image, TextureHandle},
+    texture::Image,
     Error,
 };
 
@@ -129,12 +129,7 @@ impl Font {
     // Also, I made a version which has just one font_scale parameter
     // instead of separate ones for x and y.  I'm including that change
     // here only so that I can isolate changes for now.
-    pub fn measure_text(
-        &self,
-        text: &str,
-        font_size: u16,
-        font_scale: f32,
-    ) -> TextDimensions {
+    pub fn measure_text(&self, text: &str, font_size: u16, font_scale: f32) -> TextDimensions {
         self.measure_text_ex(text, font_size, font_scale, font_scale)
     }
 
@@ -361,25 +356,26 @@ impl SpriteBatcher {
                 glyph.h as f32,
             );
 
-            let texture = {
-                let mut ctx = self.quad_ctx.lock().unwrap();
-                atlas.texture(&mut **ctx)
-            };
-            self.draw_texture_ex(
-                &crate::texture::Texture2D {
-                    texture: TextureHandle::Unmanaged(texture),
-                },
-                dest.x,
-                dest.y,
-                params.color,
-                crate::texture::DrawTextureParams {
-                    dest_size: Some(vec2(dest.w, dest.h)),
-                    source: Some(source),
-                    rotation: angle_rad,
-                    pivot: Option::Some(vec2(dest.x, dest.y)),
-                    ..Default::default()
-                },
-            );
+            // let texture = {
+            //     let mut ctx = self.quad_ctx.lock().unwrap();
+            //     atlas.texture(&mut **ctx)
+            // };
+            // self.draw_texture_ex(
+            //     &crate::texture::Texture2D {
+            //         texture: TextureHandle::Unmanaged(texture),
+            //     },
+            //     dest.x,
+            //     dest.y,
+            //     params.color,
+            //     crate::texture::DrawTextureParams {
+            //         dest_size: Some(vec2(dest.w, dest.h)),
+            //         source: Some(source),
+            //         rotation: angle_rad,
+            //         pivot: Option::Some(vec2(dest.x, dest.y)),
+            //         ..Default::default()
+            //     },
+            // );
+            unimplemented!()
         }
     }
 }

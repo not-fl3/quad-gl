@@ -193,11 +193,11 @@ impl Shader {
 #[derive(Clone)]
 pub struct Material2 {
     pub color: [f32; 4],
-    pub base_color_texture: Option<Texture2D>,
-    pub emissive_texture: Option<Texture2D>,
-    pub normal_texture: Option<Texture2D>,
-    pub occlusion_texture: Option<Texture2D>,
-    pub metallic_roughness_texture: Option<Texture2D>,
+    pub base_color_texture: Option<Arc<Texture2D>>,
+    pub emissive_texture: Option<Arc<Texture2D>>,
+    pub normal_texture: Option<Arc<Texture2D>>,
+    pub occlusion_texture: Option<Arc<Texture2D>>,
+    pub metallic_roughness_texture: Option<Arc<Texture2D>>,
     pub metallic: f32,
     pub roughness: f32,
     pub shader: Shader,
@@ -535,10 +535,10 @@ impl Scene {
                     crate::camera::Environment::Skybox(ref cubemap) => Some(cubemap.texture),
                     _ => None,
                 };
-                let or_white = |t: &Option<Texture2D>| {
+                let or_white = |t: &Option<Arc<Texture2D>>| {
                     t.as_ref().map_or(white_texture, |t| t.raw_miniquad_id())
                 };
-                let or_black = |t: &Option<Texture2D>| {
+                let or_black = |t: &Option<Arc<Texture2D>>| {
                     t.as_ref().map_or(black_texture, |t| t.raw_miniquad_id())
                 };
                 let images = [

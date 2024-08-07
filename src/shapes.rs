@@ -3,11 +3,13 @@
 use crate::color::Color;
 
 use crate::{
-    math::{vec2, Rect, Vec2, Vec3},
-
     draw_calls_batcher::{DrawMode, Vertex},
+    math::{vec2, Rect, Vec2, Vec3},
     sprite_batcher::{Axis, SpriteBatcher},
+    texture::Texture2D,
 };
+
+use std::sync::Arc;
 
 impl SpriteBatcher {
     // ERIC
@@ -227,7 +229,9 @@ pub struct ShapeBuilder {
     color: Color,
     rotation: f32,
     axis: Axis,
+    texture: Option<Arc<Texture2D>>,
 }
+
 impl ShapeBuilder {
     pub fn circle(radius: f32) -> ShapeBuilder {
         let sides = 50;
@@ -256,6 +260,7 @@ impl ShapeBuilder {
             color: crate::WHITE,
             rotation: 0.0,
             axis: Axis::Z,
+            texture: None,
         }
     }
 
@@ -311,6 +316,7 @@ impl ShapeBuilder {
             color: crate::WHITE,
             rotation: 0.0,
             axis: Axis::Z,
+            texture: None,
         }
     }
 
@@ -328,6 +334,13 @@ impl ShapeBuilder {
 
     pub fn axis(self, axis: Axis) -> ShapeBuilder {
         Self { axis, ..self }
+    }
+
+    pub fn texture(self, texture: &Arc<Texture2D>) -> ShapeBuilder {
+        Self {
+            texture: Some(texture.clone()),
+            ..self
+        }
     }
 
     pub fn draw(self, canvas: &mut SpriteBatcher) {
@@ -370,14 +383,14 @@ impl ShapeBuilder {
         let color = self.color;
         #[rustfmt::skip]
         let vertices = [
-            vertex(p[0].x, p[0].y,  sx      /w,  sy      /h, color, self.axis),
-            vertex(p[1].x, p[1].y, (sx + sw)/w,  sy      /h, color, self.axis),
-            vertex(p[2].x, p[2].y, (sx + sw)/w, (sy + sh)/h, color, self.axis),
-            vertex(p[3].x, p[3].y,  sx      /w, (sy + sh)/h, color, self.axis),
+            vertex(p[0].x, p[0].y,  sx,  sy, color, self.axis),
+            vertex(p[1].x, p[1].y, (sx + sw),  sy , color, self.axis),
+            vertex(p[2].x, p[2].y, (sx + sw), (sy + sh), color, self.axis),
+            vertex(p[3].x, p[3].y,  sx      , (sy + sh), color, self.axis),
         ];
         let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
 
-        canvas.gl().texture(None);
+        canvas.gl().texture(self.texture.map(|t| t.texture));
         canvas.gl().draw_mode(DrawMode::Triangles);
         canvas.gl().geometry(&vertices, &indices);
     }

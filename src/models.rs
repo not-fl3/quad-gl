@@ -7,6 +7,8 @@ use crate::{
 };
 use miniquad::*;
 
+use std::sync::Arc;
+
 pub struct CpuMesh(pub Vec<Vec3>, pub Vec<Vec2>, pub Vec<Vec3>, pub Vec<u16>);
 
 pub fn sphere(radius: f32, rings: u32, slices: u32) -> CpuMesh {
@@ -136,7 +138,7 @@ impl crate::QuadGl {
     pub fn mesh(
         &self,
         CpuMesh(vertices, uvs, normals, indices): CpuMesh,
-        texture: Option<Texture2D>,
+        texture: Option<Arc<Texture2D>>,
     ) -> Model {
         let mut quad_ctx = self.quad_ctx.lock().unwrap();
 

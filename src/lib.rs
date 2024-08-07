@@ -1,5 +1,4 @@
 #![allow(warnings)]
-use slotmap::SlotMap;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::pin::Pin;
@@ -24,8 +23,8 @@ pub mod telemetry;
 
 pub mod cubemap;
 mod error;
-mod tobytes;
 pub mod shadowmap;
+mod tobytes;
 
 pub use error::Error;
 
@@ -37,7 +36,7 @@ pub mod image;
 use crate::{
     color::{colors::*, Color},
     draw_calls_batcher::DrawCallsBatcher,
-    texture::TextureHandle,
+    texture::Texture2D,
 };
 
 use glam::{vec2, Mat4, Vec2};
@@ -62,18 +61,15 @@ use std::sync::{Arc, Mutex, Weak};
 #[derive(Clone)]
 pub struct QuadGl {
     pub quad_ctx: Arc<Mutex<Box<miniquad::Context>>>,
-    textures: Arc<Mutex<crate::texture::TexturesContext>>,
     fonts_storage: Arc<Mutex<text::FontsStorage>>,
 }
 
 impl QuadGl {
     pub fn new(quad_ctx: Arc<Mutex<Box<miniquad::Context>>>) -> QuadGl {
         let fonts_storage = text::FontsStorage::new(quad_ctx.lock().unwrap().as_mut());
-        let textures = crate::texture::TexturesContext::new();
         QuadGl {
             quad_ctx,
             fonts_storage: Arc::new(Mutex::new(fonts_storage)),
-            textures: Arc::new(Mutex::new(textures)),
         }
     }
 
@@ -88,11 +84,7 @@ impl QuadGl {
     // ERIC
     // I found this function in text.rs, commented out.
     // This seems like a decent place for it to go?
-    pub fn load_ttf_font_from_bytes(
-        &self,
-        bytes: &[u8]
-        ) -> Result<crate::text::Font, Error>
-    {
+    pub fn load_ttf_font_from_bytes(&self, bytes: &[u8]) -> Result<crate::text::Font, Error> {
         let atlas = Arc::new(Mutex::new(crate::text::atlas::Atlas::new(
             self.quad_ctx.lock().unwrap().as_mut(),
             miniquad::FilterMode::Linear,
@@ -104,5 +96,4 @@ impl QuadGl {
 
         Ok(font)
     }
-
 }

@@ -58,7 +58,7 @@ pub(crate) enum DrawCommand {
     },
     DrawRawTexture {
         rect: Rect,
-        texture: Texture2D,
+        texture: Arc<Texture2D>,
     },
     Clip {
         rect: Option<Rect>,
@@ -300,7 +300,7 @@ impl Painter {
                     )
                     - vec2(margin.left + margin.right, margin.top + margin.bottom);
 
-                self.draw_raw_texture(Rect::new(pos.x, pos.y, size.x, size.y), texture);
+                self.draw_raw_texture(Rect::new(pos.x, pos.y, size.x, size.y), texture.clone());
             }
         }
     }
@@ -402,7 +402,7 @@ impl Painter {
         }
     }
 
-    pub fn draw_raw_texture(&mut self, rect: Rect, texture: &Texture2D) {
+    pub fn draw_raw_texture(&mut self, rect: Rect, texture: Arc<Texture2D>) {
         if self
             .clipping_zone
             .map_or(false, |clip| !clip.overlaps(&rect))

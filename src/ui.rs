@@ -66,7 +66,7 @@ pub type Id = u64;
 
 pub enum UiContent<'a> {
     Label(Cow<'a, str>),
-    Texture(crate::texture::Texture2D),
+    Texture(Arc<crate::texture::Texture2D>),
 }
 
 impl<'a> From<&'a str> for UiContent<'a> {
@@ -81,8 +81,8 @@ impl From<String> for UiContent<'static> {
     }
 }
 
-impl From<crate::texture::Texture2D> for UiContent<'static> {
-    fn from(data: crate::texture::Texture2D) -> UiContent<'static> {
+impl From<Arc<crate::texture::Texture2D>> for UiContent<'static> {
+    fn from(data: Arc<crate::texture::Texture2D>) -> UiContent<'static> {
         UiContent::Texture(data)
     }
 }
