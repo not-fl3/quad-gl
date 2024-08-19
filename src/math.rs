@@ -4,10 +4,9 @@
 
 pub use glam::*;
 
-mod circle;
+pub mod circle;
 mod rect;
 
-pub use circle::Circle;
 pub use rect::{Rect, RectOffset};
 
 /// Converts 2d polar coordinates to 2d cartesian coordinates.

@@ -1,4 +1,4 @@
-use crate::{draw_calls_batcher::DrawCallsBatcher, text};
+use crate::{draw_calls_batcher::DrawCallsBatcher, math::Vec2, shapes::DrawParams, text};
 
 use std::sync::{Arc, Mutex};
 
@@ -33,8 +33,7 @@ impl SpriteBatcher {
     }
 
     pub fn clear(&mut self) {
-        self.batcher
-            .clear(self.quad_ctx.lock().unwrap().as_mut())
+        self.batcher.clear(self.quad_ctx.lock().unwrap().as_mut())
     }
 
     pub fn set_axis(&mut self, axis: Axis) {
@@ -53,7 +52,11 @@ impl SpriteBatcher {
         self.batcher.push_model_matrix(mat);
     }
 
-    pub fn draw(&mut self) {
+    pub fn draw(&mut self, shape: impl crate::shapes::Draw, pos: Vec2, p: impl Into<DrawParams>) {
+        shape.draw(self, pos, p);
+    }
+
+    pub fn blit(&mut self) {
         let mut ctx = self.quad_ctx.lock().unwrap();
 
         let (width, height) = miniquad::window::screen_size();
@@ -62,7 +65,7 @@ impl SpriteBatcher {
         self.batcher.draw(&mut **ctx, screen_mat, None);
     }
 
-    pub fn draw2(&mut self, camera: &crate::camera::Camera) {
+    pub fn blit2(&mut self, camera: &crate::camera::Camera) {
         let mut ctx = self.quad_ctx.lock().unwrap();
 
         let (proj, view) = camera.proj_view();
@@ -75,10 +78,8 @@ impl SpriteBatcher {
 
     // ERIC
     // I needed something like this method to get high dpi to work.
-    pub fn draw3(&mut self, mat: crate::math::Mat4)
-    {
+    pub fn blit3(&mut self, mat: crate::math::Mat4) {
         let mut ctx = self.quad_ctx.lock().unwrap();
         self.batcher.draw(&mut **ctx, mat, None);
     }
-
 }
