@@ -1266,7 +1266,7 @@ impl Ui {
         std::mem::swap(&mut ui_draw_list, &mut draw_list);
 
         let mut atlas = self.atlas.lock().unwrap();
-        let font_texture = atlas.texture(self.quad_ctx.lock().unwrap().as_mut());
+        let (font_texture, _, _) = atlas.texture(self.quad_ctx.lock().unwrap().as_mut());
         batcher.texture(Some(font_texture));
 
         for draw_command in &ui_draw_list {

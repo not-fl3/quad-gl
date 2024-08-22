@@ -84,10 +84,13 @@ impl Atlas {
         self.image.height
     }
 
-    pub fn texture(&mut self, ctx: &mut dyn miniquad::RenderingBackend) -> miniquad::TextureId {
+    pub fn texture(
+        &mut self,
+        ctx: &mut dyn miniquad::RenderingBackend,
+    ) -> (miniquad::TextureId, u32, u32) {
+        let (texture_width, texture_height) = ctx.texture_size(self.texture);
         if self.dirty {
             self.dirty = false;
-            let (texture_width, texture_height) = ctx.texture_size(self.texture);
             if texture_width != self.image.width as u32
                 || texture_height != self.image.height as u32
             {
@@ -107,7 +110,7 @@ impl Atlas {
             ctx.texture_update(self.texture, &self.image.bytes);
         }
 
-        self.texture
+        (self.texture, texture_width, texture_height)
     }
 
     pub fn get_uv_rect(&self, key: SpriteKey) -> Option<Rect> {
