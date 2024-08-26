@@ -1282,7 +1282,7 @@ impl Ui {
                     .map(|rect| (rect.x as i32, rect.y as i32, rect.w as i32, rect.h as i32)),
             );
             batcher.draw_mode(crate::draw_calls_batcher::DrawMode::Triangles);
-            batcher.geometry(&draw_command.vertices, &draw_command.indices);
+            batcher.geometry(&draw_command.vertices[..], &draw_command.indices);
         }
         batcher.texture(None);
 

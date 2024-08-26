@@ -4,7 +4,14 @@ use miniquad::*;
 
 pub use miniquad::{FilterMode, ShaderError, TextureId as MiniquadTexture};
 
-use crate::{color::Color, material::Material, telemetry, texture::Texture2D, Error};
+use crate::{
+    color::Color,
+    material::Material,
+    math::{Vec2, Vec3, Vec4, vec2, vec3, vec4},
+    telemetry,
+    texture::Texture2D,
+    Error,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DrawMode {
@@ -35,57 +42,39 @@ struct DrawCall {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Clone, Debug, Copy)]
 pub struct Vertex {
-    // ERIC
-    // the rounded rect code wants this to be less-private.
-    pub(crate) pos: [f32; 3],
-    uv: [f32; 2],
-    color: [u8; 4],
-}
-
-pub type VertexInterop = ([f32; 3], [f32; 2], [f32; 4]);
-
-impl Into<VertexInterop> for Vertex {
-    fn into(self) -> VertexInterop {
-        (
-            self.pos,
-            self.uv,
-            [
-                self.color[0] as f32 / 255.0,
-                self.color[1] as f32 / 255.0,
-                self.color[2] as f32 / 255.0,
-                self.color[3] as f32 / 255.0,
-            ],
-        )
-    }
-}
-impl Into<Vertex> for VertexInterop {
-    fn into(self) -> Vertex {
-        Vertex {
-            pos: self.0,
-            uv: self.1,
-            color: [
-                ((self.2)[0] * 255.) as u8,
-                ((self.2)[1] * 255.) as u8,
-                ((self.2)[2] * 255.) as u8,
-                ((self.2)[3] * 255.) as u8,
-            ],
-        }
-    }
+    pub position: Vec3,
+    pub uv: Vec2,
+    pub color: [u8; 4],
+    /// Normal is not used by macroquad and is completely optional.
+    /// Might be usefull for custom shaders.
+    /// While normal is not used by macroquad, it is completely safe to use it
+    /// to pass arbitary user data, hence Vec4.
+    pub normal: Vec4,
 }
 
 impl Vertex {
     pub fn new(x: f32, y: f32, z: f32, u: f32, v: f32, color: Color) -> Vertex {
         Vertex {
-            pos: [x, y, z],
-            uv: [u, v],
+            position: vec3(x, y, z),
+            uv: vec2(u, v),
             color: [
                 (color.r * 255.) as u8,
                 (color.g * 255.) as u8,
                 (color.b * 255.) as u8,
                 (color.a * 255.) as u8,
             ],
+            normal: vec4(0.0, 0.0, 0.0, 0.0),
+        }
+    }
+
+    pub fn new2(position: Vec3, uv: Vec2, color: Color) -> Vertex {
+        Vertex {
+            position,
+            uv,
+            color: color.into(),
+            normal: vec4(0.0, 0.0, 0.0, 0.0),
         }
     }
 }
@@ -780,7 +769,7 @@ impl DrawCallsBatcher {
         self.state.draw_mode = mode;
     }
 
-    pub fn geometry(&mut self, vertices: &[impl Into<VertexInterop> + Copy], indices: &[u16]) {
+    pub fn geometry(&mut self, vertices: &[Vertex], indices: &[u16]) {
         if vertices.len() >= self.max_vertices || indices.len() >= self.max_indices {
             eprintln!("geometry() exceeded max drawcall size, clamping");
         }
@@ -848,7 +837,7 @@ impl DrawCallsBatcher {
         let dc = &mut self.draw_calls[self.draw_calls_count - 1];
 
         for i in 0..vertices.len() {
-            dc.vertices[dc.vertices_count + i] = vertices[i].into().into();
+            dc.vertices[dc.vertices_count + i] = vertices[i];
         }
 
         for i in 0..indices.len() {
