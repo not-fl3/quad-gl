@@ -1,3 +1,10 @@
+use crate::{
+    color::Color,
+    math::{Vec2, vec2},
+    shapes::{Draw, DrawMode, DrawParams, DrawStyle, Mesher, Vertex, Line},
+    sprite_batcher::{Axis, SpriteBatcher},
+};
+
 pub struct Circle {
     pub radius: f32,
     pub sides: u32,
@@ -10,7 +17,7 @@ impl Circle {
 }
 
 impl Draw for Circle {
-    fn draw(self, s: &mut SpriteBatcher, pos: Vec2, p: impl Into<DrawParams>) {
+    fn draw(self, s: &mut impl Mesher, pos: Vec2, p: impl Into<DrawParams>) {
         let Vec2 { x, y } = pos;
         let p = p.into();
         match p.draw_style {
@@ -40,9 +47,9 @@ impl Draw for Circle {
                     }
                 }
 
-                s.gl().texture(None);
-                s.gl().draw_mode(DrawMode::Triangles);
-                s.gl().geometry(&vertices, &indices);
+                s.texture(None);
+                s.draw_mode(DrawMode::Triangles);
+                s.geometry(&vertices, &indices);
             }
             DrawStyle::Lines { thickness } => {
                 let rot = p.rotation.to_radians();

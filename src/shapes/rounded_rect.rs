@@ -1,3 +1,5 @@
+// TODO: move this into Rectangle
+
 use crate::color::Color;
 
 use crate::{

@@ -1,7 +1,7 @@
 use crate::{
     color::Color,
     math::Vec2,
-    shapes::{Draw, DrawMode, DrawParams, Vertex},
+    shapes::{Draw, DrawMode, DrawParams, Mesher, Vertex},
     sprite_batcher::{Axis, SpriteBatcher},
 };
 
@@ -17,7 +17,7 @@ impl Line {
     }
 }
 impl Draw for Line {
-    fn draw(self, s: &mut SpriteBatcher, pos: Vec2, p: impl Into<DrawParams>) {
+    fn draw(self, s: &mut impl Mesher, pos: Vec2, p: impl Into<DrawParams>) {
         let p = p.into();
         let Vec2 { x: x1, y: y1 } = self.p0 + pos;
         let Vec2 { x: x2, y: y2 } = self.p1 + pos;
@@ -36,10 +36,10 @@ impl Draw for Line {
         let tx = nx / tlen;
         let ty = ny / tlen;
 
-        let axis = s.axis;
-        s.gl().texture(None);
-        s.gl().draw_mode(DrawMode::Triangles);
-        s.gl().geometry(
+        let axis = p.axis;
+        s.texture(None);
+        s.draw_mode(DrawMode::Triangles);
+        s.geometry(
             &[
                 vertex(x1 + tx, y1 + ty, 0., 0., p.color, axis),
                 vertex(x1 - tx, y1 - ty, 0., 0., p.color, axis),

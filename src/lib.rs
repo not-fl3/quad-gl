@@ -15,10 +15,6 @@ pub mod text;
 pub mod texture;
 pub mod ui;
 
-// ERIC
-// I found some rounded rect code in a macroquad Pr
-pub mod rounded_rect;
-
 pub mod telemetry;
 
 pub mod cubemap;

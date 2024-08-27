@@ -2,22 +2,16 @@
 
 use miniquad::*;
 
-pub use miniquad::{FilterMode, ShaderError, TextureId as MiniquadTexture};
-
+pub use crate::shapes::DrawMode;
 use crate::{
     color::Color,
     material::Material,
-    math::{Vec2, Vec3, Vec4, vec2, vec3, vec4},
+    math::{vec2, vec3, vec4, Vec2, Vec3, Vec4},
     telemetry,
     texture::Texture2D,
     Error,
 };
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum DrawMode {
-    Triangles,
-    Lines,
-}
+pub use miniquad::{FilterMode, ShaderError, TextureId as MiniquadTexture};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct GlPipeline(usize);

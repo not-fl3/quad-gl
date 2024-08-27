@@ -5,6 +5,7 @@ use crate::{
     image,
     material::Material,
     math::{vec2, vec3, Mat4, Quat, Vec2, Vec3},
+    shapes::{Draw, DrawMode, DrawParams, Mesher, Vertex},
     telemetry, text,
     texture::Texture2D,
     tobytes::ToBytes,
@@ -526,9 +527,10 @@ impl Scene {
         let aabb = model.world_aabb;
         let m = &model;
         let model = &mut model.model;
-        if clipping_planes.iter().any(|p| !p.clip(aabb)) {
-            return;
-        }
+        // TODO: something is going on with text's AABBs
+        // if clipping_planes.iter().any(|p| !p.clip(aabb)) {
+        //     return;
+        // }
         for node in &mut model.nodes {
             for (bindings, material) in node.data.iter_mut().zip(node.materials.iter_mut()) {
                 let cubemap = match camera.environment {
@@ -711,6 +713,79 @@ impl Scene {
         self.shadowmap
             .dbg
             .draw(ctx.as_mut(), &self.shadowmap.depth_img[..]);
+    }
+
+    pub fn model(&mut self, shape: impl Draw, p: impl Into<DrawParams>) -> Model {
+        let mut mesh_builder = MeshBuilder::new(self.quad_ctx.clone(), self.fonts_storage.clone());
+        shape.draw(&mut mesh_builder, vec2(0.0, 0.0), p);
+        let mut vertices = vec![];
+        let mut uvs = vec![];
+        let mut normals = vec![];
+        for vertex in &mesh_builder.vertices {
+            vertices.push(vec3(vertex.position.x, 0.0, vertex.position.y));
+            uvs.push(vertex.uv);
+            normals.push(vec3(0.0, 0.0, 1.0));
+        }
+        let texture = mesh_builder.texture.map(|t| {
+            let ctx = self.quad_ctx.lock().unwrap();
+            let (w, h) = ctx.texture_size(t);
+            Arc::new(Texture2D::from_miniquad_id(t, w as u16, h as u16))
+        });
+        crate::models::mesh(
+            self.quad_ctx.lock().unwrap().as_mut(),
+            crate::models::CpuMesh {
+                vertices,
+                uvs,
+                normals,
+                indices: mesh_builder.indices,
+            },
+            texture,
+        )
+    }
+}
+
+struct MeshBuilder {
+    quad_ctx: Arc<Mutex<Box<dyn miniquad::RenderingBackend>>>,
+    fonts_storage: Arc<Mutex<text::FontsStorage>>,
+    texture: Option<miniquad::TextureId>,
+    vertices: Vec<Vertex>,
+    indices: Vec<u16>,
+}
+impl MeshBuilder {
+    pub fn new(
+        quad_ctx: Arc<Mutex<Box<dyn miniquad::RenderingBackend>>>,
+        fonts_storage: Arc<Mutex<text::FontsStorage>>,
+    ) -> MeshBuilder {
+        MeshBuilder {
+            quad_ctx,
+            fonts_storage,
+            texture: None,
+            vertices: vec![],
+            indices: vec![],
+        }
+    }
+}
+impl Mesher for MeshBuilder {
+    fn quad_ctx(&self) -> &Arc<Mutex<Box<miniquad::Context>>> {
+        &self.quad_ctx
+    }
+    fn fonts_storage(&self) -> &Arc<Mutex<crate::text::FontsStorage>> {
+        &self.fonts_storage
+    }
+
+    fn texture(&mut self, texture: Option<miniquad::TextureId>) {
+        if self.texture.is_some() && self.texture != texture {
+            unimplemented!("multiple textures not yet supported");
+        }
+        self.texture = texture;
+    }
+    fn draw_mode(&mut self, mode: DrawMode) {}
+    fn geometry(&mut self, vertices: &[Vertex], indices: &[u16]) {
+        let last_index = self.vertices.len() as u16;
+        self.vertices.extend_from_slice(vertices);
+        for index in indices {
+            self.indices.push(last_index + index);
+        }
     }
 }
 

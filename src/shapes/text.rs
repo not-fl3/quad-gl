@@ -1,7 +1,7 @@
 use crate::{
     color::Color,
     math::{vec2, Vec2},
-    shapes::{Draw, DrawMode, DrawParams, DrawStyle, Rect, Sprite, Vertex},
+    shapes::{Draw, DrawMode, DrawParams, DrawStyle, Mesher, Rect, Sprite, Vertex},
     sprite_batcher::{Axis, SpriteBatcher},
     text::Font,
 };
@@ -36,11 +36,11 @@ impl<'a, 'b> Text<'a, 'b> {
 }
 
 impl<'a, 'b> Draw for Text<'a, 'b> {
-    fn draw(self, s: &mut SpriteBatcher, pos: Vec2, p: impl Into<DrawParams>) {
+    fn draw(self, s: &mut impl Mesher, pos: Vec2, p: impl Into<DrawParams>) {
         let Vec2 { x, y } = pos;
         let p = p.into();
         let font = {
-            let fonts = s.fonts_storage.lock().unwrap();
+            let fonts = s.fonts_storage().lock().unwrap();
             self.font.unwrap_or_else(|| &fonts.default_font).clone()
         };
 
@@ -91,7 +91,7 @@ impl<'a, 'b> Draw for Text<'a, 'b> {
             );
 
             let (texture, w, h) = {
-                let mut ctx = s.quad_ctx.lock().unwrap();
+                let mut ctx = s.quad_ctx().lock().unwrap();
                 atlas.texture(&mut **ctx)
             };
             Sprite {

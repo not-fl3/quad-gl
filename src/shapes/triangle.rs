@@ -1,7 +1,7 @@
 use crate::{
     color::Color,
     math::Vec2,
-    shapes::{Draw, DrawMode, DrawParams, Vertex, DrawStyle},
+    shapes::{Draw, DrawMode, DrawParams, Vertex, DrawStyle, Mesher},
     sprite_batcher::{Axis, SpriteBatcher},
 };
 
@@ -16,7 +16,7 @@ impl Triangle {
     }
 }
 impl Draw for Triangle {
-    fn draw(self, s: &mut SpriteBatcher, pos: Vec2, p: impl Into<DrawParams>) {
+    fn draw(self, s: &mut impl Mesher, pos: Vec2, p: impl Into<DrawParams>) {
         let p = p.into();
         let mut vertices = Vec::<Vertex>::with_capacity(3);
 
@@ -28,8 +28,8 @@ impl Draw for Triangle {
         vertices.push(Vertex::new(v3.x, v3.y, 0., 0., 0., p.color));
         let indices: [u16; 3] = [0, 1, 2];
 
-        s.gl().texture(None);
-        s.gl().draw_mode(DrawMode::Triangles);
-        s.gl().geometry(&vertices, &indices);
+        s.texture(None);
+        s.draw_mode(DrawMode::Triangles);
+        s.geometry(&vertices, &indices);
     }
 }

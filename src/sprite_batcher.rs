@@ -1,4 +1,9 @@
-use crate::{draw_calls_batcher::DrawCallsBatcher, math::Vec2, shapes::DrawParams, text};
+use crate::{
+    draw_calls_batcher::{DrawCallsBatcher, Vertex},
+    math::Vec2,
+    shapes::{DrawMode, DrawParams},
+    text,
+};
 
 use std::sync::{Arc, Mutex};
 
@@ -14,6 +19,25 @@ pub struct SpriteBatcher {
     pub(crate) fonts_storage: Arc<Mutex<text::FontsStorage>>,
     pub(crate) batcher: DrawCallsBatcher,
     pub(crate) axis: Axis,
+}
+
+impl crate::shapes::Mesher for SpriteBatcher {
+    fn quad_ctx(&self) -> &Arc<Mutex<Box<miniquad::Context>>> {
+        &self.quad_ctx
+    }
+    fn fonts_storage(&self) -> &Arc<Mutex<crate::text::FontsStorage>> {
+        &self.fonts_storage
+    }
+
+    fn texture(&mut self, texture: Option<miniquad::TextureId>) {
+        self.batcher.texture(texture);
+    }
+    fn draw_mode(&mut self, mode: DrawMode) {
+        self.batcher.draw_mode(mode);
+    }
+    fn geometry(&mut self, vertices: &[Vertex], indices: &[u16]) {
+        self.batcher.geometry(vertices, indices)
+    }
 }
 
 impl SpriteBatcher {

@@ -1,7 +1,7 @@
 use crate::{
     color::Color,
     math::Vec2,
-    shapes::{Draw, DrawMode, DrawParams, Vertex, DrawStyle},
+    shapes::{Draw, DrawMode, DrawParams, DrawStyle, Mesher, Vertex},
     sprite_batcher::{Axis, SpriteBatcher},
 };
 
@@ -15,7 +15,7 @@ impl Rectangle {
     }
 }
 impl Draw for Rectangle {
-    fn draw(self, s: &mut SpriteBatcher, pos: Vec2, p: impl Into<DrawParams>) {
+    fn draw(self, s: &mut impl Mesher, pos: Vec2, p: impl Into<DrawParams>) {
         let p = p.into();
 
         let Vec2 { x, y } = pos;
@@ -30,9 +30,9 @@ impl Draw for Rectangle {
                     Vertex::new(x    , y + h, 0., 0.0, 0.0, p.color),
                 ];
                 let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
-                s.gl().texture(None);
-                s.gl().draw_mode(DrawMode::Triangles);
-                s.gl().geometry(&vertices, &indices);
+                s.texture(None);
+                s.draw_mode(DrawMode::Triangles);
+                s.geometry(&vertices, &indices);
             }
             DrawStyle::Lines { thickness } => {
                 let t = thickness / 2.;
@@ -53,9 +53,9 @@ impl Draw for Rectangle {
                     0, 1, 4, 1, 4, 5, 1, 5, 6, 1, 2, 6, 3, 7, 2, 2, 7, 6, 0, 4, 3, 3, 4, 7,
                 ];
 
-                s.gl().texture(None);
-                s.gl().draw_mode(DrawMode::Triangles);
-                s.gl().geometry(&vertices, &indices);
+                s.texture(None);
+                s.draw_mode(DrawMode::Triangles);
+                s.geometry(&vertices, &indices);
             }
         }
     }

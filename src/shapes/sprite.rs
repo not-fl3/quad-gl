@@ -1,7 +1,7 @@
 use crate::{
     color::Color,
     math::{vec2, Rect, Vec2},
-    shapes::{Draw, DrawMode, DrawParams, DrawStyle, Vertex},
+    shapes::{Draw, DrawMode, DrawParams, DrawStyle, Vertex, Mesher},
     sprite_batcher::{Axis, SpriteBatcher},
     texture::Texture2D,
 };
@@ -46,11 +46,11 @@ impl<'a> Sprite<'a> {
     }
 }
 impl<'a> Draw for Sprite<'a> {
-    fn draw(self, s: &mut SpriteBatcher, pos: Vec2, p: impl Into<DrawParams>) {
+    fn draw(self, s: &mut impl Mesher, pos: Vec2, p: impl Into<DrawParams>) {
         let params = p.into();
         let Vec2 { x, y } = pos;
         let (width, height) = {
-            let quad_ctx = s.quad_ctx.lock().unwrap();
+            let quad_ctx = s.quad_ctx().lock().unwrap();
             quad_ctx.texture_size(self.texture.raw_miniquad_id())
         };
         let (width, height) = (width as f32, height as f32);
@@ -131,8 +131,8 @@ impl<'a> Draw for Sprite<'a> {
         ];
         let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
 
-        s.gl().texture(Some(self.texture.raw_miniquad_id()));
-        s.gl().draw_mode(DrawMode::Triangles);
-        s.gl().geometry(&vertices, &indices);
+        s.texture(Some(self.texture.raw_miniquad_id()));
+        s.draw_mode(DrawMode::Triangles);
+        s.geometry(&vertices, &indices);
     }
 }

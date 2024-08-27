@@ -2,7 +2,6 @@
 
 use crate::{color::Color, image, math::Rect, text::atlas::SpriteKey, Error};
 
-use crate::draw_calls_batcher::{DrawMode, Vertex};
 use glam::{vec2, Vec2};
 
 pub use miniquad::FilterMode;
