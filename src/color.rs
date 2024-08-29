@@ -105,6 +105,16 @@ impl Color {
     pub fn from_vec(vec: glam::Vec4) -> Self {
         Self::new(vec.x, vec.y, vec.z, vec.w)
     }
+
+    pub fn mix(&self, second: &Color, amount: f32) -> Color {
+        let amount_s = 1.0 - amount;
+        Color::new(
+            &self.r * amount + second.r * amount_s,
+            &self.g * amount + second.g * amount_s,
+            &self.b * amount + second.b * amount_s,
+            &self.a * amount + second.a * amount_s,
+        )
+    }
 }
 
 pub mod colors {

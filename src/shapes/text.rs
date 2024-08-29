@@ -97,13 +97,20 @@ impl<'a, 'b> Draw for Text<'a, 'b> {
             Sprite {
                 dest_size: Some(vec2(dest.w, dest.h)),
                 source: Some(source),
-                rotation: angle_rad,
-                pivot: Option::Some(vec2(dest.x, dest.y)),
                 ..Sprite::new(&Arc::new(crate::texture::Texture2D::from_miniquad_id(
                     texture, w as _, h as _,
                 )))
             }
-            .draw(s, vec2(dest.x, dest.y), p.color);
+            .draw(
+                s,
+                vec2(dest.x, dest.y),
+                DrawParams {
+                    rotation: angle_rad,
+                    pivot: Option::Some(vec2(dest.x, dest.y)),
+                    color: p.color,
+                    ..Default::default()
+                },
+            );
         }
     }
 }

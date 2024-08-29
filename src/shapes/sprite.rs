@@ -16,21 +16,11 @@ pub struct Sprite<'a> {
     /// Is None by default
     pub source: Option<Rect>,
 
-    /// Rotation in radians
-    pub rotation: f32,
-
     /// Mirror on the X axis
     pub flip_x: bool,
 
     /// Mirror on the Y axis
     pub flip_y: bool,
-
-    /// Rotate around this point.
-    /// When `None`, rotate around the texture's center.
-    /// When `Some`, the coordinates are in screen-space.
-    /// E.g. pivot (0,0) rotates around the top left corner of the screen, not of the
-    /// texture.
-    pub pivot: Option<Vec2>,
 }
 impl<'a> Sprite<'a> {
     pub fn new(texture: &'a Arc<Texture2D>) -> Sprite {
@@ -38,8 +28,6 @@ impl<'a> Sprite<'a> {
             texture,
             dest_size: None,
             source: None,
-            rotation: 0.,
-            pivot: None,
             flip_x: false,
             flip_y: false,
         }
@@ -94,7 +82,7 @@ impl<'a> Draw for Sprite<'a> {
             h = -h;
         }
 
-        let pivot = self.pivot.unwrap_or(vec2(x + w / 2., y + h / 2.));
+        let pivot = params.pivot.unwrap_or(vec2(x + w / 2., y + h / 2.));
         let m = pivot;
         let p = [
             vec2(x, y) - pivot,
@@ -102,7 +90,7 @@ impl<'a> Draw for Sprite<'a> {
             vec2(x + w, y + h) - pivot,
             vec2(x, y + h) - pivot,
         ];
-        let r = self.rotation;
+        let r = params.rotation;
         let p = [
             vec2(
                 p[0].x * r.cos() - p[0].y * r.sin(),

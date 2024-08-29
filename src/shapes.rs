@@ -13,12 +13,12 @@ use crate::{
 
 use std::sync::{Arc, Mutex};
 
+mod circle;
 mod line;
 mod rectangle;
 mod sprite;
 mod text;
 mod triangle;
-mod circle;
 
 pub use circle::Circle;
 pub use line::Line;
@@ -43,7 +43,14 @@ enum DrawStyle {
 pub struct DrawParams {
     pub color: Color,
     pub draw_style: DrawStyle,
+    /// Rotation in radians
     pub rotation: f32,
+    /// Rotate around this point.
+    /// When `None`, rotate around the texture's center.
+    /// When `Some`, the coordinates are in screen-space.
+    /// E.g. pivot (0,0) rotates around the top left corner of the screen, not of the
+    /// texture.
+    pub pivot: Option<Vec2>,
     pub axis: Axis,
 }
 impl Default for DrawParams {
@@ -52,6 +59,7 @@ impl Default for DrawParams {
             color: crate::color::WHITE,
             draw_style: DrawStyle::Solid,
             rotation: 0.0,
+            pivot: None,
             axis: Axis::Z,
         }
     }
@@ -62,6 +70,7 @@ impl From<Color> for DrawParams {
             color,
             draw_style: DrawStyle::Solid,
             rotation: 0.0,
+            pivot: None,
             axis: Axis::Z,
         }
     }
