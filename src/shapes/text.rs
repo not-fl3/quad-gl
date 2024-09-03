@@ -95,7 +95,7 @@ impl<'a, 'b> Draw for Text<'a, 'b> {
                 atlas.texture(&mut **ctx)
             };
             Sprite {
-                dest_size: Some(vec2(dest.w, dest.h)),
+                size: Some(vec2(dest.w, dest.h)),
                 source: Some(source),
                 ..Sprite::new(&Arc::new(crate::texture::Texture2D::from_miniquad_id(
                     texture, w as _, h as _,

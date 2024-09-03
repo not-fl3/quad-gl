@@ -1,6 +1,6 @@
 use crate::{
     draw_calls_batcher::{DrawCallsBatcher, Vertex},
-    math::Vec2,
+    math::{vec2, Mat4, Vec2},
     shapes::{DrawMode, DrawParams},
     text,
 };
@@ -14,11 +14,19 @@ pub enum Axis {
     Z,
 }
 
+pub enum ViewportBound {
+    Vertical(f32),
+    Horizontal(f32),
+}
+
 pub struct SpriteBatcher {
     pub(crate) quad_ctx: Arc<Mutex<Box<miniquad::Context>>>,
     pub(crate) fonts_storage: Arc<Mutex<text::FontsStorage>>,
     pub(crate) batcher: DrawCallsBatcher,
     pub(crate) axis: Axis,
+    pub viewport_center: Option<Vec2>,
+    pub viewport_bound: Option<ViewportBound>,
+    pub matrix_override: Option<Mat4>,
 }
 
 impl crate::shapes::Mesher for SpriteBatcher {
@@ -53,6 +61,9 @@ impl SpriteBatcher {
             fonts_storage: fonts_storage.clone(),
             batcher,
             axis: Axis::Z,
+            viewport_center: None,
+            viewport_bound: None,
+            matrix_override: None,
         }
     }
 
@@ -72,10 +83,6 @@ impl SpriteBatcher {
         self.batcher.reset()
     }
 
-    pub fn wtf(&mut self, mat: crate::math::Mat4) {
-        self.batcher.push_model_matrix(mat);
-    }
-
     pub fn draw(&mut self, shape: impl crate::shapes::Draw, pos: Vec2, p: impl Into<DrawParams>) {
         shape.draw(self, pos, p);
     }
@@ -83,27 +90,42 @@ impl SpriteBatcher {
     pub fn blit(&mut self) {
         let mut ctx = self.quad_ctx.lock().unwrap();
 
-        let (width, height) = miniquad::window::screen_size();
-
-        let screen_mat = glam::Mat4::orthographic_rh_gl(0., width, height, 0., -1., 1.);
+        let screen_mat = self.matrix_override.unwrap_or_else(|| {
+            let screen_size = miniquad::window::screen_size();
+            let aspect = screen_size.0 / screen_size.1;
+            let (width, height) = match self.viewport_bound {
+                None => screen_size,
+                Some(ViewportBound::Vertical(h)) => (h * aspect, h),
+                Some(ViewportBound::Horizontal(w)) => (w, w / aspect),
+            };
+            let Vec2 { x, y } = self
+                .viewport_center
+                .unwrap_or(vec2(width / 2., height / 2.));
+            Mat4::orthographic_rh_gl(
+                x - width / 2.,
+                x + width / 2.,
+                y + height / 2.,
+                y - height / 2.,
+                -1.,
+                1.,
+            )
+        });
         self.batcher.draw(&mut **ctx, screen_mat, None);
     }
 
-    pub fn blit2(&mut self, camera: &crate::camera::Camera) {
-        let mut ctx = self.quad_ctx.lock().unwrap();
-
-        let (proj, view) = camera.proj_view();
-        self.batcher.draw(
-            &mut **ctx,
-            proj * view,
-            camera.render_target.clone().map(|t| t.render_pass),
-        );
+    pub fn set_viewport_center(&mut self, point: Vec2) {
+        self.viewport_center = Some(point);
     }
 
-    // ERIC
-    // I needed something like this method to get high dpi to work.
-    pub fn blit3(&mut self, mat: crate::math::Mat4) {
-        let mut ctx = self.quad_ctx.lock().unwrap();
-        self.batcher.draw(&mut **ctx, mat, None);
+    pub fn set_viewport_bound(&mut self, bound: ViewportBound) {
+        self.viewport_bound = Some(bound);
+    }
+
+    /// Set screen projection matrix
+    /// This override any other set_* functions, canvas.blit() will use
+    /// this exact matrix.
+    /// Might be useful for custom cameras implementation.
+    pub fn set_override_matrix(&mut self, mat: Mat4) {
+        self.matrix_override = Some(mat);
     }
 }

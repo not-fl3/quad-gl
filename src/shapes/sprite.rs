@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 pub struct Sprite<'a> {
     pub texture: &'a Arc<Texture2D>,
-    pub dest_size: Option<Vec2>,
+    pub size: Option<Vec2>,
     /// Part of texture to draw. If None - draw the whole texture.
     /// Good use example: drawing an image from texture atlas.
     /// Is None by default
@@ -26,10 +26,16 @@ impl<'a> Sprite<'a> {
     pub fn new(texture: &'a Arc<Texture2D>) -> Sprite {
         Sprite {
             texture,
-            dest_size: None,
+            size: None,
             source: None,
             flip_x: false,
             flip_y: false,
+        }
+    }
+    pub fn size(self, size: Vec2) -> Sprite<'a> {
+        Sprite {
+            size: Some(size),
+            ..self
         }
     }
 }
@@ -67,7 +73,7 @@ impl<'a> Draw for Sprite<'a> {
         //     })
         //     .unwrap_or(texture.clone());
 
-        let (mut w, mut h) = match self.dest_size {
+        let (mut w, mut h) = match self.size {
             Some(dst) => (dst.x, dst.y),
             _ => (sw, sh),
         };

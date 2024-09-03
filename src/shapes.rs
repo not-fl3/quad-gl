@@ -2,10 +2,13 @@
 
 use crate::color::Color;
 
-pub use crate::draw_calls_batcher::Vertex;
+pub use crate::{
+    draw_calls_batcher::Vertex,
+    sprite_batcher::{SpriteBatcher, ViewportBound},
+};
 use crate::{
     math::{vec2, Rect, Vec2, Vec3},
-    sprite_batcher::{Axis, SpriteBatcher},
+    sprite_batcher::Axis,
     text::Font,
     texture::Texture2D,
     QuadGl,
