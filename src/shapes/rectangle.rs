@@ -44,6 +44,13 @@ impl Rectangle {
             rounded_corners: None,
         }
     }
+
+    pub fn rounded_corners(self, rounded_corners: RoundedCorners) -> Rectangle {
+        Rectangle {
+            rounded_corners: Some(rounded_corners),
+            ..self
+        }
+    }
 }
 
 // TODO: could be better integrated into draw()?
