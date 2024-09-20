@@ -1,6 +1,6 @@
 use crate::{
     draw_calls_batcher::{DrawCallsBatcher, Vertex},
-    math::{vec2, Mat4, Vec2},
+    math::{vec2, vec3, Mat4, Rect, Vec2},
     shapes::{DrawMode, DrawParams},
     text,
 };
@@ -25,6 +25,7 @@ pub struct SpriteBatcher {
     pub(crate) batcher: DrawCallsBatcher,
     pub(crate) axis: Axis,
     pub viewport_center: Option<Vec2>,
+    pub viewport_rotation: Option<f32>,
     pub viewport_bound: Option<ViewportBound>,
     pub matrix_override: Option<Mat4>,
 }
@@ -62,13 +63,14 @@ impl SpriteBatcher {
             batcher,
             axis: Axis::Z,
             viewport_center: None,
+            viewport_rotation: None,
             viewport_bound: None,
             matrix_override: None,
         }
     }
 
     pub fn clear(&mut self) {
-        self.batcher.clear(self.quad_ctx.lock().unwrap().as_mut())
+        self.batcher.clear(self.quad_ctx.lock().unwrap().as_mut());
     }
 
     pub fn set_axis(&mut self, axis: Axis) {
@@ -87,34 +89,77 @@ impl SpriteBatcher {
         shape.draw(self, pos, p);
     }
 
-    pub fn blit(&mut self) {
-        let mut ctx = self.quad_ctx.lock().unwrap();
+    pub fn viewport(&self, target: Option<&crate::texture::RenderTarget>) -> Rect {
+        let ctx = self.quad_ctx.lock().unwrap();
+        let screen_size = miniquad::window::screen_size();
+        let (width, height) = if let Some(render_pass) = target.as_ref().map(|t| t.render_pass) {
+            let render_texture = ctx.render_pass_texture(render_pass);
+            let (width, height) = ctx.texture_size(render_texture);
+            (width as f32, height as f32)
+        } else {
+            (screen_size.0, screen_size.1)
+        };
 
-        let screen_mat = self.matrix_override.unwrap_or_else(|| {
-            let screen_size = miniquad::window::screen_size();
-            let aspect = screen_size.0 / screen_size.1;
+        let m = self.matrix(width, height).inverse();
+        let p0_world = m.transform_point3(vec3(-1.0, 1.0, 0.));
+        let p1_world = m.transform_point3(vec3(1.0, -1.0, 0.));
+        Rect::new(
+            p0_world.x,
+            p0_world.y,
+            p1_world.x - p0_world.x,
+            p1_world.y - p0_world.y,
+        )
+    }
+
+    fn matrix(&self, width: f32, height: f32) -> Mat4 {
+        self.matrix_override.unwrap_or_else(|| {
+            let aspect = width / height;
             let (width, height) = match self.viewport_bound {
-                None => screen_size,
+                None => (width, height),
                 Some(ViewportBound::Vertical(h)) => (h * aspect, h),
                 Some(ViewportBound::Horizontal(w)) => (w, w / aspect),
             };
             let Vec2 { x, y } = self
                 .viewport_center
                 .unwrap_or(vec2(width / 2., height / 2.));
-            Mat4::orthographic_rh_gl(
-                x - width / 2.,
-                x + width / 2.,
-                y + height / 2.,
-                y - height / 2.,
-                -1.,
-                1.,
-            )
-        });
-        self.batcher.draw(&mut **ctx, screen_mat, None);
+
+            let mat_origin = Mat4::from_translation(vec3(-x, -y, 0.0));
+            let mat_rotation = Mat4::from_axis_angle(
+                vec3(0.0, 0.0, 1.0),
+                self.viewport_rotation.unwrap_or(0.0).to_radians(),
+            );
+            let mat_scale = Mat4::from_scale(vec3(2.0 / width, -2.0 / height, 1.0));
+            let offset = vec2(0.0, 0.0);
+            let mat_translation = Mat4::from_translation(vec3(offset.x, offset.y, 0.0));
+            mat_translation * ((mat_scale * mat_rotation) * mat_origin)
+        })
+    }
+
+    pub fn blit(&mut self, render_pass: Option<miniquad::RenderPass>) {
+        let mut ctx = self.quad_ctx.lock().unwrap();
+
+        let screen_size = miniquad::window::screen_size();
+        let (width, height) = if let Some(render_pass) = render_pass {
+            let render_texture = ctx.render_pass_texture(render_pass);
+            let (width, height) = ctx.texture_size(render_texture);
+            (width as f32, height as f32)
+        } else {
+            (screen_size.0, screen_size.1)
+        };
+
+        let screen_mat = if render_pass.is_none() {
+            self.matrix(width, height)
+        } else {
+            Mat4::from_scale(vec3(1.0, -1.0, 1.0)) * self.matrix(width, height)
+        };
+        self.batcher.draw(&mut **ctx, screen_mat, render_pass);
     }
 
     pub fn set_viewport_center(&mut self, point: Vec2) {
         self.viewport_center = Some(point);
+    }
+    pub fn set_viewport_rotation(&mut self, r: f32) {
+        self.viewport_rotation = Some(r);
     }
 
     pub fn set_viewport_bound(&mut self, bound: ViewportBound) {
